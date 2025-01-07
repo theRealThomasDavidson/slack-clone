@@ -23,8 +23,8 @@ class ConnectionManager:
             self._initialized = True
 
     async def connect(self, websocket: WebSocket, username: str):
-        logger.debug(f"Accepting WebSocket connection for user {username}")
-        await websocket.accept()
+        """Add a new WebSocket connection"""
+        logger.debug(f"Adding WebSocket connection for user {username}")
         self.active_connections[username] = websocket
         logger.debug(f"Connected users: {list(self.active_connections.keys())}")
 
@@ -53,30 +53,18 @@ class ConnectionManager:
             self.channel_subscriptions[channel_id].discard(username)
 
     async def broadcast_to_channel(self, message: dict, channel_id: str):
-        logger.debug(f"Broadcasting message to channel {channel_id}")
+        """Broadcast a message to all users subscribed to a channel"""
+        logger.info(f"Broadcasting message to channel {channel_id}: {message}")
         if channel_id not in self.channel_subscriptions:
-            logger.debug(f"No subscribers for channel {channel_id}")
+            logger.warning(f"No subscribers found for channel {channel_id}")
             return
             
-        # Get all subscribers for this channel
-        subscribers = self.channel_subscriptions[channel_id]
-        
-        # Send to all subscribed users
-        for username in subscribers:
+        for username in self.channel_subscriptions[channel_id]:
             if username in self.active_connections:
-                try:
-                    # Add 3-second timeout to send operation
-                    await asyncio.wait_for(
-                        self.active_connections[username].send_json(message),
-                        timeout=3.0  # seconds
-                    )
-                    logger.debug(f"Message sent to user {username}")
-                except asyncio.TimeoutError:
-                    logger.error(f"Timeout sending message to {username}")
-                except Exception as e:
-                    logger.error(f"Error sending to {username}: {str(e)}")
+                logger.info(f"Sending message to user {username} in channel {channel_id}")
+                await self.active_connections[username].send_json(message)
             else:
-                logger.debug(f"User {username} not connected")
+                logger.warning(f"User {username} not connected but subscribed to channel {channel_id}")
 
     async def broadcast(self, message: dict):
         logger.debug("Broadcasting message globally")

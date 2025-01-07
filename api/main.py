@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from .routes.auth import router as auth_router
 from .routes.users import router as users_router
@@ -8,9 +8,10 @@ from .core.config import settings
 
 app = FastAPI(title=settings.APP_NAME)
 
+# Configure CORS for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # More permissive for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

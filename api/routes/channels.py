@@ -58,4 +58,19 @@ async def delete_channel(
 ):
     """Delete a channel (owner only)"""
     await channel_service.delete_channel(channel_name, current_user)
-    return {"message": "Channel deleted successfully"} 
+    return {"message": "Channel deleted successfully"}
+
+@router.get("/{channel_name}/status")
+async def get_subscription_status(
+    channel_name: str,
+    current_user: User = Depends(auth_service.get_current_user)
+):
+    """Check if the current user is subscribed to a channel"""
+    channel = channel_service.get_channel(channel_name)
+    if not channel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Channel not found"
+        )
+    is_subscribed = channel_service.is_user_subscribed(channel.id, current_user.id)
+    return {"is_subscribed": is_subscribed} 

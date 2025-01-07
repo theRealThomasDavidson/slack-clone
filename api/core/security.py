@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -18,16 +18,52 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+    print(f"Creating token that expires at UTC: {expire}")
+    to_encode.update({"exp": expire.timestamp()})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 def verify_token(token: str) -> Optional[str]:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        print(f"Starting token verification for token: {token[:20]}...")
+        
+        # Decode and validate the token
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={
+                "verify_signature": True,  # Verify the signature
+                "verify_exp": True,        # Verify expiration
+                "verify_sub": True,        # Verify subject claim exists
+                "require_exp": True        # Require expiration claim
+            }
+        )
+        print(f"Token decoded successfully. Payload: {payload}")
+        
+        # Extract and validate username from subject claim
         username: str = payload.get("sub")
-        if username is None:
+        if not username:
+            print("Token validation failed: No username in subject claim")
             return None
+            
+        # Check if token is expired (redundant with verify_exp but explicit)
+        exp = payload.get("exp")
+        if not exp:
+            print("Token validation failed: No expiration claim")
+            return None
+            
+        exp_datetime = datetime.fromtimestamp(exp, tz=timezone.utc)
+        current_time = datetime.now(timezone.utc)
+        print(f"Token expires at (UTC): {exp_datetime}")
+        print(f"Current time (UTC): {current_time}")
+        
+        if exp_datetime < current_time:
+            print(f"Token validation failed: Token expired at {exp_datetime} UTC")
+            return None
+            
+        print(f"Token validation successful for username: {username}")
         return username
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT validation error: {str(e)}")
         return None 

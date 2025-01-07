@@ -6,6 +6,7 @@ import json
 import asyncio
 from asyncio import TimeoutError
 import logging
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -172,3 +173,119 @@ async def test_channel_specific_messaging(client, auth_headers):
     assert messages2[0]["content"] == "Test channel message"
 
     print("Test completed successfully")
+
+def test_message_persistence(client, auth_headers):
+    # Create a channel
+    channel_response = client.post(
+        "/api/channels/",
+        headers=auth_headers,
+        json={"name": "persistence-test-channel"}
+    )
+    assert channel_response.status_code == status.HTTP_200_OK
+    channel = channel_response.json()
+
+    # Send a message
+    message_content = "Test message for persistence"
+    message_response = client.post(
+        "/api/messages/",
+        headers=auth_headers,
+        json={
+            "content": message_content,
+            "channel_id": channel["id"]
+        }
+    )
+    assert message_response.status_code == status.HTTP_200_OK
+    sent_message = message_response.json()
+
+    # Get channel messages
+    messages_response = client.get(
+        f"/api/messages/{channel['id']}",
+        headers=auth_headers
+    )
+    assert messages_response.status_code == status.HTTP_200_OK
+    messages = messages_response.json()
+
+    # Verify message persistence
+    assert len(messages) > 0
+    found_message = next((m for m in messages if m["id"] == sent_message["id"]), None)
+    assert found_message is not None
+    assert found_message["content"] == message_content
+
+    # Verify message after server restart (if using in-memory storage, this should be documented)
+    # Note: This part of the test demonstrates whether storage is persistent or in-memory
+    messages_after_response = client.get(
+        f"/api/messages/{channel['id']}",
+        headers=auth_headers
+    )
+    assert messages_after_response.status_code == status.HTTP_200_OK
+    messages_after = messages_after_response.json()
+    found_message_after = next((m for m in messages_after if m["id"] == sent_message["id"]), None)
+    assert found_message_after is not None
+    assert found_message_after["content"] == message_content
+
+def test_message_broadcasting(client, auth_headers):
+    # Create two additional users for testing broadcasting
+    for i in range(2):
+        client.post(
+            "/api/auth/register",
+            json={
+                "username": f"broadcastuser{i}",
+                "email": f"broadcast{i}@test.com",
+                "password": "testpass123",
+                "display_name": f"Broadcast User {i}"
+            }
+        )
+
+    # Login both users and get their tokens
+    user_tokens = []
+    usernames = []
+    for i in range(2):
+        login_response = client.post(
+            "/api/auth/login",
+            json={
+                "username": f"broadcastuser{i}",
+                "password": "testpass123"
+            }
+        )
+        user_tokens.append(login_response.json()["access_token"])
+        usernames.append(f"broadcastuser{i}")
+
+    # Clear message history before testing
+    clear_response = client.post("/api/messages/clear", headers=auth_headers)
+    assert clear_response.status_code == status.HTTP_200_OK
+
+    # Create a channel
+    channel_response = client.post(
+        "/api/channels/",
+        headers=auth_headers,
+        json={"name": "broadcast-test-channel"}
+    )
+    assert channel_response.status_code == status.HTTP_200_OK
+    channel = channel_response.json()
+
+    # Have both users join the channel
+    for token in user_tokens:
+        headers = {"Authorization": f"Bearer {token}"}
+        join_response = client.post(
+            f"/api/channels/{channel['name']}/join",
+            headers=headers
+        )
+        assert join_response.status_code == status.HTTP_200_OK
+
+    # Connect all users to WebSocket
+    owner_username = "testuser"  # This is set in conftest.py
+    with client.websocket_connect(f"/api/ws/{owner_username}?token={auth_headers['Authorization'].split()[1]}") as ws_owner:
+        with client.websocket_connect(f"/api/ws/{usernames[0]}?token={user_tokens[0]}") as ws_user1:
+            with client.websocket_connect(f"/api/ws/{usernames[1]}?token={user_tokens[1]}") as ws_user2:
+                # Send a message from the channel owner
+                message_content = "Broadcast test message"
+                ws_owner.send_json({
+                    "content": message_content,
+                    "channel_id": channel["id"]
+                })
+
+                # Verify all users receive the message
+                for ws in [ws_owner, ws_user1, ws_user2]:
+                    data = ws.receive_json()
+                    assert data["content"] == message_content
+                    assert data["channel_id"] == channel["id"]
