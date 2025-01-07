@@ -92,11 +92,23 @@ The second release enhances the messaging experience with rich content support a
 ## functional requirements
 ## V1
 ### core messaging functionality
-- real time messaging
-- messaging history
-- max length 2000 characters
-- rate limiting 5 messages per 5 seconds
-- support plain text with ability to add files later
+- Real-time messaging via WebSocket
+  - Persistent WebSocket connections
+  - Automatic reconnection handling
+  - Message history on connection
+  - User presence tracking
+  - Channel-specific routing
+- Message features
+  - Max length 2000 characters
+  - Rate limiting 5 messages per 5 seconds
+  - Support plain text (files in V2)
+  - Real-time delivery
+  - Message ordering preservation
+- Performance
+  - Message delivery < 1 second
+  - Connection recovery < 3 seconds
+  - Support for 100+ simultaneous connections
+  - Efficient bandwidth usage
 
 ### channel management
 - create channel
