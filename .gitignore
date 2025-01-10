@@ -56,4 +56,10 @@ frontend/out/
 htmlcov/
 .pytest_cache/
 
+# Documentation and temporary files
+today checklist
+TODAY.md
+checklist.md
+downloaded_*
+
 
