@@ -15,11 +15,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make scripts executable
+# Make start script executable
 RUN chmod +x /app/scripts/start.sh
 
 # Set environment variables
 ENV PYTHONPATH=/app
 
 # Run the application
-CMD ["/app/scripts/start.sh"] 
+CMD ["/bin/sh", "/app/scripts/start.sh"] 

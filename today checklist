@@ -1,0 +1,170 @@
+# Development Checklist - Backend, Frontend, and Deployment
+
+## Today's Progress (January 10, 2025)
+- [x] Fixed file-message relationship in database
+- [x] Added file ID extraction from message content
+- [x] Updated message model with file attachment support
+- [x] Fixed UploadFile import issue
+- [x] Unified file upload and message creation endpoints
+- [x] Tested unified endpoint functionality
+- [x] Verified file attachments in messages
+- [x] Checked database tables and relationships
+
+## Backend Endpoint Verification
+- [x] Start backend Docker container
+- [x] Test all API endpoints systematically:
+  - [x] Authentication endpoints
+    - [x] POST /api/v1/auth/register (✓ tested with newuser123)
+    - [x] POST /api/v1/auth/login (✓ tested, returns valid JWT token)
+    - [x] POST /api/v1/auth/logout (✓ tested, successfully logs out)
+    - [x] GET /api/v1/auth/me (✓ tested, returns user profile)
+  - [x] User-related endpoints
+    - [x] GET /api/v1/users/me (✓ tested, returns current user profile)
+    - [x] PUT /api/v1/users/me (✓ tested, updates user settings)
+    - [x] GET /api/v1/users (✓ tested, returns list of users)
+    - [x] GET /api/v1/users/{username} (✓ tested, returns specific user)
+  - [x] Channel endpoints
+    - [x] POST /api/v1/channels (✓ tested, creates channel successfully)
+    - [x] GET /api/v1/channels (✓ tested, lists public channels)
+    - [x] GET /api/v1/channels/me (✓ tested, shows user channels)
+    - [x] GET /api/v1/channels/{channel_id} (✓ tested with channel 24)
+    - [x] POST /api/v1/channels/{channel_id}/join (✓ tested successfully)
+    - [x] POST /api/v1/channels/{channel_id}/leave (✓ tested successfully)
+    - [x] POST /api/v1/channels/{channel_id}/members/{user_id} (✓ tested successfully)
+  - [x] Message & Reaction endpoints
+    - [x] POST /api/v1/messages (✓ tested message creation)
+    - [x] GET /api/v1/messages/{message_id} (✓ tested retrieval)
+    - [x] POST /channels/{channel_id}/messages/{message_id}/reactions (✓ tested with emojis)
+    - [x] GET /channels/{channel_id}/messages/{message_id}/reactions (✓ tested, returns with usernames)
+  - [x] File endpoints
+    - [x] POST /api/v1/files/upload (✓ endpoint implemented)
+    - [x] GET /api/v1/files/{file_id} (✓ metadata retrieval works)
+    - [x] DELETE /api/v1/files/{file_id} (✓ deletion implemented)
+  - [x] Health check endpoint (✓ tested root endpoint)
+- [x] Verify error handling for each endpoint:
+  - [x] 403 for unauthorized access to private channels
+  - [x] 400 for duplicate channel names
+  - [x] 404 for non-existent channels/users
+  - [x] 403 for forbidden operations
+- [x] Check response formats and status codes
+- [x] Document any failing endpoints
+- [x] Create API reference documentation (✓ API_REFERENCE.md created)
+
+## Frontend Features Implementation
+### Emoji Reactions
+- [x] Set up emoji picker component
+- [x] Implement emoji reaction storage in state
+- [x] Create API endpoints for saving/retrieving reactions (✓ tested with peggyolson user)
+- [x] Add reaction counter display (✓ backend implementation complete)
+- [x] Test reaction toggling functionality (✓ tested POST and GET endpoints)
+- [x] Handle concurrent reactions from multiple users (✓ implemented with unique constraints)
+- [x] Implement frontend progress indicator
+- [x] Implement frontend message features:
+    - [x] Emoji reactions:
+        - [x] Add emoji picker component at bottom of messages
+        - [x] Style emoji reaction display
+        - [x] Implement click handlers for adding/removing reactions
+        - [x] Show reaction counts
+        - [x] Detailed implementation tasks:
+            - [x] Library Setup:
+                - [x] Install @emoji-mart/react and dependencies
+                - [x] Configure emoji data and settings
+                - [x] Test basic emoji rendering
+            - [x] Base Emoji Picker Component:
+                - [x] Create component structure
+                - [x] Add emoji search functionality
+                - [x] Implement emoji selection
+                - [x] Add recent emojis section
+                - [x] Style the picker UI
+            - [x] Message Reaction Integration:
+                - [x] Add reaction button to messages
+                - [x] Display existing reactions
+                - [x] Handle adding/removing reactions
+                - [x] Show reaction counts
+                - [x] Add hover states and tooltips
+            - [x] State Management:
+                - [x] Store reaction data
+                - [x] Handle optimistic updates
+                - [x] Manage reaction loading states
+                - [x] Handle errors
+            - [x] Animation and Polish:
+                - [x] Add loading states
+                - [x] Handle error states
+
+### File Upload System
+- [x] Set up Docker volume for persistent storage:
+  - [x] Configure volume mount (✓ mounted at /app/uploads)
+  - [x] Test persistence across restarts (✓ files remain after container restart)
+- [x] Test file upload (✓ successfully uploads with unique UUIDs)
+- [x] Test file size validation:
+  - [x] Files under 10MB limit (✓ tested with 12 byte text file)
+  - [x] Files over 10MB limit (✓ tested with 13.44MB CSV file, properly rejected with 400 error)
+  - [x] Remove content type restrictions (✓ now accepts all file types)
+- [x] Test file download functionality:
+  - [x] Download own files
+  - [x] Download with original filename
+  - [x] Verify content integrity
+- [x] Test file deletion:
+  - [x] Owner can delete
+  - [x] Non-owner cannot delete (403 error verified in code)
+  - [x] Verify file removed from disk
+  - [x] Verify database record removed
+- [x] Backend Implementation:
+  - [x] Fix file-message relationship in database
+  - [x] Add file ID extraction from message content
+  - [x] Update message model with file attachment support
+  - [x] Fix UploadFile import issue
+  - [x] Unify file upload and message creation endpoints
+  - [x] Test unified endpoint functionality
+- [x] Frontend Implementation:
+  - [x] File Message Component:
+    - [x] Create FileMessage component to display file info
+  - [x] File Upload UI:
+    - [x] Style paperclip button
+    - [x] Add upload progress indicator
+    - [x] Show file size limits
+    - [x] Support drag and drop
+    - [x] Handle multiple file selection
+  - [x] Error Handling:
+    - [x] Show size limit errors
+    - [x] Display upload failures
+    - [x] Handle network issues
+    - [x] Show delete confirmation
+  - [x] Message Display:
+    - [x] Clean up file message display
+    - [x] Show file download button
+    - [x] Hide technical details (file IDs)
+
+## Docker Configuration
+- [x] Update frontend Dockerfile
+- [x] Configure environment variables
+- [x] Test file upload in Docker environment
+- [x] Verify emoji reactions in containerized app
+- [x] Test container networking
+- [x] Optimize Docker image size
+
+## EC2 Deployment
+- [x] Launch EC2 instance
+- [x] Configure security groups:
+  - [x] HTTP/HTTPS ports
+  - [x] SSH access
+  - [x] Application-specific ports
+- [x] Install Docker on EC2
+- [x] Set up environment variables on EC2
+- [ ] Configure domain/DNS (if applicable)
+- [x] Deploy containers:
+  - [x] Push images to registry
+  - [x] Pull images on EC2
+  - [x] Start containers
+- [ ] Set up SSL/HTTPS
+- [ ] Configure backup strategy
+- [ ] Test full application flow on EC2
+- [ ] Document deployment process
+
+## Final Verification
+- [ ] Test all features in production environment
+- [ ] Verify file upload limits on EC2
+- [ ] Check emoji reaction performance
+- [ ] Monitor server resources
+- [ ] Document any remaining issues
+- [x] Clean up test python scripts
