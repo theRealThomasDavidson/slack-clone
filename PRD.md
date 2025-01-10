@@ -116,6 +116,11 @@ The second release enhances the messaging experience with rich content support a
 - leave channel
 - channel names
 - channel history
+- ban/unban users from channels
+  - Channel owners can ban users
+  - Banned users cannot join or view the channel
+  - Channel owners can view and manage banned users list
+  - Ban by username or user ID
 
 ### User Management
 - create user

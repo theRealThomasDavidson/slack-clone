@@ -30,24 +30,40 @@ def redis_client():
 def clean_redis(redis_client):
     """Clean Redis before each test."""
     redis_client.flushdb()
-    yield
-    redis_client.flushdb()
 
 @pytest.fixture
-async def redis_manager():
-    """Get the Redis manager instance with async initialization."""
+async def redis_manager(redis_client):
+    """Create a RedisManager instance for testing."""
     manager = RedisManager()
     await manager.initialize()
     yield manager
-    await manager.cleanup()
+    await manager.close()
 
 @pytest.fixture
 def client():
-    """Get the FastAPI test client."""
-    with TestClient(app) as client:
-        yield client
+    """Create a test client."""
+    return TestClient(app)
 
 @pytest.fixture
-async def test_client(client):
-    """Get an async test client."""
-    yield client 
+def test_client(client):
+    """Create a test client that can be used in async tests."""
+    return client
+
+@pytest.fixture
+def test_user_token(client):
+    """Create a test user and return their token."""
+    response = client.post(
+        "/api/auth/register",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpass123",
+            "display_name": "Test User"
+        }
+    )
+    return response.json()["access_token"]
+
+@pytest.fixture
+def auth_headers(test_user_token):
+    """Create authorization headers for the test user."""
+    return {"Authorization": f"Bearer {test_user_token}"} 

@@ -65,18 +65,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (username: string, password: string) => {
     try {
+      const formData = new URLSearchParams();
+      formData.append('username', username);
+      formData.append('password', password);
+
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({ username, password }),
+        body: formData,
       });
 
       if (!response.ok) {
+        // Try to parse as JSON first, fallback to text if that fails
         const errorText = await response.text();
-        console.error('Login failed:', errorText);
-        throw new Error('Login failed');
+        let errorMessage: string;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || 'Login failed';
+        } catch {
+          errorMessage = errorText || 'Login failed';
+        }
+        console.error('Login failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -105,10 +117,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Registration failed');
+        // Try to parse as JSON first, fallback to text if that fails
+        const errorText = await response.text();
+        let errorMessage: string;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || 'Registration failed';
+        } catch {
+          errorMessage = errorText || 'Registration failed';
+        }
+        throw new Error(errorMessage);
       }
 
+      const data = await response.json();
+      
       // After successful registration, log in
       await login(username, password);
     } catch (error) {

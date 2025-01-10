@@ -1,14 +1,15 @@
 """
-Data storage and retrieval layer
+Repository package initialization.
+Contains database and storage access implementations.
 """
-from .base import BaseRepository
+
+# Import repository implementations here as needed
+# This allows importing directly from api.repositories
+
 from .user import UserRepository
-from .message import MessageRepository
 from .channel import ChannelRepository
 
 __all__ = [
-    'BaseRepository',
-    'UserRepository',
-    'MessageRepository',
-    'ChannelRepository'
-] 
+    "UserRepository",
+    "ChannelRepository"
+]

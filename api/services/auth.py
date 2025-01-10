@@ -1,19 +1,17 @@
-from typing import Optional, Dict
-from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from datetime import datetime, timedelta
+from typing import Optional
+import jwt
+from fastapi import HTTPException, status
 from ..models.user import User, UserCreate
-from ..models.auth import Token, TokenData
 from ..repositories.user import UserRepository
-from ..core.security import verify_password, get_password_hash, create_access_token, verify_token
+from ..utils.websocket import ConnectionManager
+from .channel import ChannelService
 from ..core.config import settings
-from ..services.channel import ChannelService
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+from ..core.database import SessionLocal
 
 class AuthService:
     _instance = None
-    _active_tokens: Dict[str, datetime] = {}  # Shared across all instances
+    _initialized = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -21,84 +19,85 @@ class AuthService:
         return cls._instance
 
     def __init__(self):
-        # Initialize only once
-        if not hasattr(self, 'initialized'):
-            self.initialized = True
-            self.user_repository = UserRepository()
+        if not self._initialized:
+            db = SessionLocal()
+            self.repository = UserRepository(db)
             self.channel_service = ChannelService()
+            self.connection_manager = ConnectionManager()
+            self._initialized = True
 
-    async def authenticate_user(self, username: str, password: str) -> Optional[User]:
-        user = self.user_repository.get_by_username(username)
-        if not user:
-            return None
-        if not verify_password(password, user.hashed_password):
-            return None
-        return user
+    def create_access_token(self, user: User) -> str:
+        """Create a new access token for a user"""
+        expiration = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        
+        token_data = {
+            "sub": user.id,
+            "username": user.username,
+            "exp": expiration
+        }
+        
+        return jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-    async def create_user(self, user_data: UserCreate) -> User:
-        # Check if username exists
-        if self.user_repository.get_by_username(user_data.username):
+    def verify_token(self, token: str) -> Optional[User]:
+        """Verify an access token and return the user if valid"""
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id is None:
+                return None
+            return self.repository.get_by_id(user_id)
+        except jwt.PyJWTError:
+            return None
+
+    def register(self, user_data: UserCreate) -> User:
+        """Register a new user"""
+        try:
+            return self.repository.create_user(user_data)
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered"
+                detail=str(e)
             )
-        
-        # Create user with hashed password
-        hashed_password = get_password_hash(user_data.password)
-        user = self.user_repository.create_user(user_data, hashed_password)
-        
-        # Add user to default channels
-        await self.channel_service.ensure_default_channels(user)
-        
-        return user
 
-    async def login(self, username: str, password: str) -> Token:
-        user = await self.authenticate_user(username, password)
-        if not user:
+    def login(self, username: str, password: str) -> tuple[User, str]:
+        """Login a user and return their access token"""
+        user = self.repository.get_by_username(username)
+        if not user or not self.repository.verify_password(password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
+                detail="Invalid username or password"
             )
-
-        # Ensure user is in default channels
-        await self.channel_service.ensure_default_channels(user)
-
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": user.username}, expires_delta=access_token_expires
-        )
-        
-        self._active_tokens[user.username] = datetime.utcnow() + access_token_expires
-        return Token(access_token=access_token)
-
-    async def get_current_user(self, token: str = Depends(oauth2_scheme)) -> User:
-        print(f"Verifying token: {token[:20]}...")
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-        username = verify_token(token)
-        print(f"Verified username: {username}")
-        
-        if username is None:
-            print("Username was None")
-            raise credentials_exception
             
-        user = self.user_repository.get_by_username(username)
-        print(f"Found user: {user}")
+        # Update online status
+        user = self.repository.set_online_status(user.id, True)
         
-        if user is None:
-            print("User was None")
-            raise credentials_exception
-            
-        # For development, we'll trust the JWT validation
-        # In production, you'd want to check against a persistent token store
-        return user
+        # Generate access token
+        access_token = self.create_access_token(user)
+        
+        return user, access_token
 
-    async def logout(self, username: str):
-        """Remove user's active token"""
-        if username in self._active_tokens:
-            del self._active_tokens[username] 
+    def logout(self, user_id: str):
+        """Logout a user"""
+        self.repository.set_online_status(user_id, False)
+
+    def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Get a user by their ID"""
+        return self.repository.get_by_id(user_id)
+
+    def get_user_by_username(self, username: str) -> Optional[User]:
+        """Get a user by their username"""
+        return self.repository.get_by_username(username)
+
+    def get_all_users(self) -> list[User]:
+        """Get all users"""
+        return self.repository.get_all_users()
+
+    def update_display_name(self, user_id: str, display_name: str) -> User:
+        """Update a user's display name"""
+        try:
+            return self.repository.update_display_name(user_id, display_name)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            ) 

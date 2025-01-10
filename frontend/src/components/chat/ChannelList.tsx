@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../contexts/BackendConfig';
 
 interface Channel {
   id: string;
@@ -15,33 +16,77 @@ interface ChannelListProps {
 }
 
 const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChannelId }) => {
-  // Mock channels for development
-  const [channels] = useState<Channel[]>([
-    {
-      id: 'general',
-      name: 'General',
-      description: 'General discussion channel',
-      owner_id: 'system',
-      members: ['system']
-    },
-    {
-      id: 'random',
-      name: 'Random',
-      description: 'Random discussions',
-      owner_id: 'system',
-      members: ['system']
-    }
-  ]);
-
+  const { token } = useAuth();
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCreateChannel = (e: React.FormEvent) => {
+  // Fetch channels
+  const fetchChannels = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/channels/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch channels');
+      }
+      
+      const data = await response.json();
+      setChannels(data);
+    } catch (err) {
+      console.error('Error fetching channels:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load channels');
+    }
+  };
+
+  // Fetch channels on mount and when token changes
+  useEffect(() => {
+    if (token) {
+      fetchChannels();
+    }
+  }, [token]);
+
+  const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would make an API call
-    console.log('Creating channel:', newChannelName);
-    setShowCreateChannel(false);
-    setNewChannelName('');
+    setError(null);
+    console.log('Attempting to create channel:', newChannelName);
+    console.log('Using token:', token);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/channels/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: newChannelName,
+          description: `${newChannelName} channel`
+        })
+      });
+
+      console.log('Response status:', response.status);
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData.detail || 'Failed to create channel');
+      }
+
+      // Refresh the channels list
+      await fetchChannels();
+      
+      // Reset form
+      setShowCreateChannel(false);
+      setNewChannelName('');
+    } catch (err) {
+      console.error('Error creating channel:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create channel');
+    }
   };
 
   return (
@@ -49,12 +94,23 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
       <div className="p-4 border-b border-gray-700">
         <h2 className="text-lg font-semibold text-white mb-4">Channels</h2>
         <button
-          onClick={() => setShowCreateChannel(true)}
+          onClick={() => {
+            console.log('Create Channel button clicked');
+            console.log('Current showCreateChannel:', showCreateChannel);
+            setShowCreateChannel(true);
+            console.log('New showCreateChannel value should be true');
+          }}
           className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           Create Channel
         </button>
       </div>
+
+      {error && (
+        <div className="p-4 text-red-500 bg-red-100 border-b border-red-200">
+          {error}
+        </div>
+      )}
 
       {showCreateChannel && (
         <div className="p-4 border-b border-gray-700">
@@ -62,7 +118,10 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
             <input
               type="text"
               value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
+              onChange={(e) => {
+                console.log('Channel name changed:', e.target.value);
+                setNewChannelName(e.target.value);
+              }}
               placeholder="Channel name"
               className="w-full p-2 mb-2 bg-gray-700 text-white rounded"
             />

@@ -1,33 +1,18 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { WebSocketProvider } from './contexts/WebSocketContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Chat from './pages/Chat';
-import PrivateRoute from './components/auth/PrivateRoute';
+import { ApiProvider } from './contexts/ApiContext';
+import AppRoutes from './routes';
 
 const App: React.FC = () => {
   return (
-    <Router>
+    <BrowserRouter>
       <AuthProvider>
-        <WebSocketProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/chat"
-              element={
-                <PrivateRoute>
-                  <Chat />
-                </PrivateRoute>
-              }
-            />
-            <Route path="/" element={<Navigate to="/chat" replace />} />
-          </Routes>
-        </WebSocketProvider>
+        <ApiProvider>
+          <AppRoutes />
+        </ApiProvider>
       </AuthProvider>
-    </Router>
+    </BrowserRouter>
   );
 };
 

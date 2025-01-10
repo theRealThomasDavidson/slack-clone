@@ -1,22 +1,11 @@
-"""
-Pydantic models for data validation
-"""
-from .user import User, UserCreate, UserUpdate, UserBase
-from .message import Message, MessageCreate
-from .channel import Channel, ChannelCreate
-from .auth import Token, TokenData, LoginRequest, RegisterRequest
+"""Models package for database and API schemas"""
+
+from .base import Base
+from .user import User
+from .channel import Channel
 
 __all__ = [
-    'User',
-    'UserCreate',
-    'UserUpdate',
-    'UserBase',
-    'Message',
-    'MessageCreate',
-    'Channel',
-    'ChannelCreate',
-    'Token',
-    'TokenData',
-    'LoginRequest',
-    'RegisterRequest'
-] 
+    "Base",
+    "User",
+    "Channel"
+]

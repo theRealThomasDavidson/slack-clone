@@ -1,3 +1,3 @@
 """
-Chat Application API
+Chat API Package
 """ 

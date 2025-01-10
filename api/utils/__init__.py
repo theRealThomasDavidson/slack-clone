@@ -1,6 +1,1 @@
-"""
-Utility functions and helpers
-"""
-from .websocket import ConnectionManager
-
-__all__ = ['ConnectionManager'] 
+# Empty __init__.py file to mark directory as a Python package

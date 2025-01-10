@@ -12,23 +12,18 @@ http://your-api-domain/api
 POST /auth/register
 Body: {
   username: string;
-  email: string;
   password: string;
-  display_name: string;
 }
 Response: {
   id: string;
   username: string;
-  email: string;
-  display_name: string;
-  is_online: boolean;
-  created_at: string;
+  is_active: boolean;
 }
 ```
 
 ### Login
 ```typescript
-POST /auth/login
+POST /auth/token
 Body: {
   username: string;
   password: string;
@@ -54,27 +49,28 @@ Response: {
 
 ### Create Channel
 ```typescript
-POST /channels/
+POST /channels
 Headers: {
   Authorization: "Bearer ${token}"
 }
 Body: {
   name: string;
   description: string;
+  type: "public" | "private";
 }
 Response: {
   id: string;
   name: string;
   description: string;
-  owner_id: string;
-  members: string[];
+  created_by: string;
+  type: string;
   created_at: string;
 }
 ```
 
 ### Get All Channels
 ```typescript
-GET /channels/
+GET /channels
 Headers: {
   Authorization: "Bearer ${token}"
 }
@@ -92,7 +88,7 @@ Response: Channel[]
 
 ### Join Channel
 ```typescript
-POST /channels/{channel_name}/join
+POST /channels/{channel_id}/join
 Headers: {
   Authorization: "Bearer ${token}"
 }
@@ -101,45 +97,126 @@ Response: Channel
 
 ### Leave Channel
 ```typescript
-POST /channels/{channel_name}/leave
+POST /channels/{channel_id}/leave
 Headers: {
   Authorization: "Bearer ${token}"
 }
 Response: Channel
 ```
 
+### Ban User by ID
+```typescript
+POST /channels/{channel_id}/ban/{user_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: Channel
+Description: Ban a user from a channel by their user ID. Only channel owners can ban users.
+Error responses:
+  - 404: User or channel not found
+  - 400: Cannot ban yourself or channel owner
+  - 403: Not channel owner
+```
+
+### Unban User by ID
+```typescript
+POST /channels/{channel_id}/unban/{user_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: Channel
+Description: Unban a user from a channel by their user ID. Only channel owners can unban users.
+Error responses:
+  - 404: User or channel not found
+  - 403: Not channel owner
+```
+
+### Ban User by Username
+```typescript
+POST /channels/{channel_id}/ban-by-username/{username}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: Channel
+Description: Ban a user from a channel by their username. Only channel owners can ban users. Banned users cannot join or view the channel.
+Error responses:
+  - 404: User or channel not found
+  - 400: Cannot ban yourself or channel owner
+  - 403: Not channel owner
+```
+
+### Unban User by Username
+```typescript
+POST /channels/{channel_id}/unban-by-username/{username}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: Channel
+Description: Unban a user from a channel by their username. Only channel owners can unban users. Unbanned users can rejoin the channel.
+Error responses:
+  - 404: User or channel not found
+  - 403: Not channel owner
+```
+
+### Get Banned Users
+```typescript
+GET /channels/{channel_id}/banned-users
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: {
+  id: string;
+  username: string;
+}[]
+Description: Get a list of all banned users in a channel. Only channel owners can view the banned users list.
+Error responses:
+  - 403: Not channel owner
+  - 404: Channel not found
+```
+
 ## Messages
 
-### Get Recent Messages
+### REST Endpoints
+
+#### Get Channel Messages
 ```typescript
-GET /messages
+GET /messages/channel/{channel_id}
 Headers: {
   Authorization: "Bearer ${token}"
 }
 Response: Message[]
+Description: Get all messages in a channel
 ```
 
-### Get Channel Messages
+#### Add Message (REST)
 ```typescript
-GET /messages/{channel_id}
+POST /messages
 Headers: {
   Authorization: "Bearer ${token}"
 }
-Response: Message[]
+Body: {
+  content: string;
+  channel_id: string;
+}
+Response: Message
+Description: Add a new message to a channel
 ```
 
-### Get User Messages
+#### Delete Message
 ```typescript
-GET /messages/me
+DELETE /messages/{message_id}
 Headers: {
   Authorization: "Bearer ${token}"
 }
-Response: Message[]
+Response: {
+  message: "Message deleted successfully"
+}
+Description: Delete a message (only the message author can delete)
 ```
 
-## WebSocket Integration
+### WebSocket Integration
 
-### Connection
+#### Connection
 ```typescript
 // Connect to WebSocket with authentication
 const connectWebSocket = (token: string, username: string) => {
@@ -148,165 +225,129 @@ const connectWebSocket = (token: string, username: string) => {
 };
 ```
 
-### Message Format
+#### Message Format
 ```typescript
-// Message structure for sending
+// Message structure for sending via WebSocket
 interface OutgoingMessage {
   content: string;
   channel_id: string;
 }
 
-// Message structure received
-interface IncomingMessage {
+// Message structure received (both REST and WebSocket)
+interface Message {
   id: string;
   content: string;
   channel_id: string;
   username: string;
   user_id: string;
-  timestamp: string;
+  created_at: string;
 }
 ```
 
-### Example React Integration
+## Reactions
+
+### Add Reaction
 ```typescript
-import { useEffect, useRef } from 'react';
-
-const ChatComponent = () => {
-  const wsRef = useRef<WebSocket | null>(null);
-
-  useEffect(() => {
-    // Connect to WebSocket
-    const token = "your-auth-token";
-    const username = "current-username";
-    wsRef.current = new WebSocket(`ws://your-api-domain/api/ws/${username}?token=${token}`);
-
-    // Handle incoming messages
-    wsRef.current.onmessage = (event) => {
-      const message: IncomingMessage = JSON.parse(event.data);
-      // Handle the message (e.g., update state, display in UI)
-      console.log('Received message:', message);
-    };
-
-    // Handle connection open
-    wsRef.current.onopen = () => {
-      console.log('WebSocket connected');
-    };
-
-    // Handle errors
-    wsRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    // Handle connection close
-    wsRef.current.onclose = () => {
-      console.log('WebSocket disconnected');
-      // Implement reconnection logic if needed
-    };
-
-    // Cleanup on unmount
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, []);
-
-  // Function to send a message
-  const sendMessage = (content: string, channelId: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const message: OutgoingMessage = {
-        content,
-        channel_id: channelId
-      };
-      wsRef.current.send(JSON.stringify(message));
-    }
-  };
-
-  return (
-    // Your chat UI components
-  );
-};
-
-export default ChatComponent;
+POST /reactions
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Body: {
+  message_id: string;
+  emoji: string;  // Unicode emoji (e.g., "👍", "❤️", "😊")
+}
+Response: {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
 ```
 
-### WebSocket Events
+### Remove Reaction
+```typescript
+DELETE /reactions/{reaction_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: {
+  message: "Reaction removed successfully"
+}
+```
 
-1. **Connection**
-   - WebSocket connects automatically when you provide the token
-   - Receives message history for user's channels
-   - Auto-subscribes to user's channels
+### Get Message Reactions
+```typescript
+GET /reactions/message/{message_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: {
+  id: string;
+  message_id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}[]
+```
 
-2. **Sending Messages**
-   - Send JSON message with content and channel_id
-   - Receive immediate feedback through WebSocket
-   - All channel members receive the message in real-time
+## Files
 
-3. **Receiving Messages**
-   - Messages include full details (id, content, user, timestamp)
-   - Messages are ordered by timestamp
-   - Messages include channel context
+### Upload File
+```typescript
+POST /files/upload
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Body: FormData {
+  file: File;
+  channel_id: string;
+}
+Response: {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  channel_id: string;
+  uploaded_by: string;
+  created_at: string;
+}
+```
 
-4. **Error Handling**
-   - Connection errors (4001: Invalid token)
-   - Username mismatch (4003: Username doesn't match token)
-   - Regular WebSocket errors (connection lost, etc.)
+### Download File
+```typescript
+GET /files/{file_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: File (binary)
+```
 
-### Best Practices
+### Get Channel Files
+```typescript
+GET /files/channel/{channel_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  channel_id: string;
+  uploaded_by: string;
+  created_at: string;
+}[]
+```
 
-1. **Connection Management**
-   ```typescript
-   // Implement reconnection with exponential backoff
-   const connectWithRetry = (token: string, username: string, retries = 0) => {
-     const ws = new WebSocket(`ws://your-api-domain/api/ws/${username}?token=${token}`);
-     
-     ws.onclose = () => {
-       const timeout = Math.min(1000 * Math.pow(2, retries), 10000);
-       setTimeout(() => connectWithRetry(token, username, retries + 1), timeout);
-     };
-     
-     return ws;
-   };
-   ```
-
-2. **Message Queue**
-   ```typescript
-   // Queue messages when connection is lost
-   const messageQueue: OutgoingMessage[] = [];
-   
-   ws.onopen = () => {
-     while (messageQueue.length > 0) {
-       const message = messageQueue.shift();
-       if (message) {
-         ws.send(JSON.stringify(message));
-       }
-     }
-   };
-   
-   const sendMessage = (content: string, channelId: string) => {
-     const message: OutgoingMessage = { content, channel_id: channelId };
-     if (ws.readyState === WebSocket.OPEN) {
-       ws.send(JSON.stringify(message));
-     } else {
-       messageQueue.push(message);
-     }
-   };
-   ```
-
-3. **State Management**
-   ```typescript
-   // Example using React context for chat state
-   interface ChatState {
-     messages: Record<string, IncomingMessage[]>; // Keyed by channel_id
-     channels: Channel[];
-     connected: boolean;
-   }
-   
-   const ChatContext = createContext<ChatState>({
-     messages: {},
-     channels: [],
-     connected: false
-   });
-   ```
-
-This API is fully compatible with React and follows standard WebSocket protocols. The WebSocket connection provides real-time updates, and the REST endpoints allow for data fetching and state management. The authentication flow uses JWT tokens which can be easily stored in localStorage or a secure cookie. 
+### Delete File
+```typescript
+DELETE /files/{file_id}
+Headers: {
+  Authorization: "Bearer ${token}"
+}
+Response: {
+  message: "File deleted successfully"
+}
+Description: Only the file uploader or channel owner can delete files
+``` 

@@ -1,30 +1,40 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, status
+from datetime import datetime
 from ..services.message import MessageService
 from ..services.auth import AuthService
 from ..services.channel import ChannelService
 from ..models.message import MessageCreate, Message
 from ..models.user import User
-from ..core.security import verify_token
 from ..utils.redis_manager import RedisManager
-from typing import List
+from typing import List, Optional
 import logging
-from fastapi import status
+from fastapi.security import OAuth2PasswordBearer
 
 router = APIRouter(tags=["messages"])
-message_service = MessageService()
-auth_service = AuthService()
-channel_service = ChannelService()
-redis_manager = RedisManager()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 logger = logging.getLogger(__name__)
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    auth_service = AuthService()
+    user = auth_service.verify_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
 
 @router.post("/messages", response_model=Message)
 async def create_message(
     message_data: MessageCreate,
-    current_user: User = Depends(auth_service.get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new message"""
     logger.info(f"Received message creation request: {message_data}")
     logger.info(f"From user: {current_user.username} (ID: {current_user.id})")
+    
+    message_service = MessageService()
     
     # Update the message with user info
     message_data.username = current_user.username
@@ -36,48 +46,30 @@ async def create_message(
     return message
 
 @router.get("/messages", response_model=List[Message])
-async def get_messages(current_user: User = Depends(auth_service.get_current_user)):
+async def get_messages(current_user: User = Depends(get_current_user)):
     """Get recent messages"""
+    message_service = MessageService()
     return message_service.get_recent_messages()
 
 @router.get("/messages/me", response_model=List[Message])
-async def get_my_messages(current_user: User = Depends(auth_service.get_current_user)):
+async def get_my_messages(current_user: User = Depends(get_current_user)):
     """Get current user's messages"""
+    message_service = MessageService()
     return message_service.get_user_messages(current_user.id)
 
 @router.get("/messages/{channel_id}", response_model=List[Message])
 async def get_channel_messages(
     channel_id: str,
-    current_user: User = Depends(auth_service.get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """Get messages for a specific channel"""
-    # Get messages from Redis first
-    messages = await redis_manager.get_channel_messages(channel_id)
-    if not messages:
-        # Fall back to database if no messages in Redis
-        messages = message_service.get_channel_messages(channel_id)
-    return messages
-
-@router.get("/channels/{channel_name}/messages")
-async def get_channel_messages_by_name(
-    channel_name: str,
-    current_user: User = Depends(auth_service.get_current_user)
-):
-    """Get messages for a specific channel by name"""
-    channel = channel_service.get_channel(channel_name)
-    if not channel:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Channel not found"
-        )
-    messages = await redis_manager.get_channel_messages(channel.id)
-    if not messages:
-        messages = message_service.get_channel_messages(channel.id)
-    return messages
+    message_service = MessageService()
+    return message_service.get_channel_messages(channel_id, current_user.id)
 
 @router.post("/messages/clear")
-async def clear_messages(current_user: User = Depends(auth_service.get_current_user)):
+async def clear_messages(current_user: User = Depends(get_current_user)):
     """Clear all messages (for testing only)"""
+    message_service = MessageService()
     message_service.clear_messages()
     return {"message": "Messages cleared"}
 
@@ -87,25 +79,23 @@ async def websocket_endpoint(
     username: str,
     token: str
 ):
+    auth_service = AuthService()
+    message_service = MessageService()
+    channel_service = ChannelService()
+    redis_manager = RedisManager()
+    
     try:
-        # First verify the token is valid
-        verified_username = verify_token(token)
-        if not verified_username:
+        # First verify the token
+        user = auth_service.verify_token(token)
+        if not user:
             logger.error(f"Invalid token for user {username}")
             await websocket.close(code=4001, reason="Invalid or expired token")
             return
             
         # Then verify username matches
-        if username != verified_username:
-            logger.error(f"Username mismatch: {username} != {verified_username}")
+        if username != user.username:
+            logger.error(f"Username mismatch: {username} != {user.username}")
             await websocket.close(code=4003, reason="Username mismatch")
-            return
-            
-        # Get the user object
-        user = auth_service.user_repository.get_by_username(username)
-        if not user:
-            logger.error(f"User not found: {username}")
-            await websocket.close(code=4004, reason="User not found")
             return
 
         # Connect to Redis manager
@@ -113,14 +103,6 @@ async def websocket_endpoint(
         logger.info(f"User {username} connected successfully")
 
         try:
-            # Ensure default channels exist and user is subscribed
-            channels = await channel_service.ensure_default_channels(user)
-            
-            # Subscribe to user's channels
-            for channel in channels:
-                await redis_manager.subscribe_to_channel(username, channel.id)
-                logger.debug(f"Subscribed {username} to channel {channel.id}")
-
             while True:
                 # Receive and process messages
                 data = await websocket.receive_json()
@@ -145,14 +127,9 @@ async def websocket_endpoint(
                         user_id=user.id
                     )
                     
-                    # Save the message
+                    # Save and broadcast the message
                     saved_message = await message_service.add_message(message_data)
-                    
-                    # Broadcast through Redis
-                    await redis_manager.broadcast_to_channel(
-                        saved_message.model_dump(),
-                        channel_id
-                    )
+                    logger.info(f"Message saved and broadcast: {saved_message}")
                     
                 except Exception as e:
                     logger.error(f"Error processing message: {str(e)}")
@@ -174,19 +151,3 @@ async def websocket_endpoint(
             await websocket.close(code=4000, reason=str(e))
         except:
             pass  # Connection might already be closed 
-
-@router.get("/channels/{channel_name}/messages")
-async def get_channel_messages_by_name(
-    channel_name: str,
-    current_user: User = Depends(auth_service.get_current_user)
-):
-    """Get messages for a specific channel by name"""
-    channel = channel_service.get_channel(channel_name)
-    if not channel:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Channel not found"
-        )
-    messages = message_service.get_channel_messages(channel.id)
-    print(f"Found {len(messages)} messages for channel {channel_name} (ID: {channel.id})")
-    return messages 

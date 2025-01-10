@@ -68,12 +68,38 @@ class RedisManager:
     async def disconnect(self, username: str):
         """Disconnect a WebSocket client"""
         logger.info(f"Disconnecting user: {username}")
-        self.local_connections.pop(username, None)
-        self.redis.hdel("user_servers", username)
-        
-        # Remove from all channel subscriptions
-        for channel in self.redis.smembers(f"user:{username}:channels"):
-            await self.unsubscribe_from_channel(username, channel)
+        try:
+            # Remove local connection first
+            self.local_connections.pop(username, None)
+            
+            # Remove server mapping
+            self.redis.hdel("user_servers", username)
+            
+            # Get all channels before removing subscriptions
+            channels = list(self.redis.smembers(f"user:{username}:channels"))
+            
+            # Remove from all channel subscriptions
+            for channel in channels:
+                try:
+                    await self.unsubscribe_from_channel(username, channel)
+                except Exception as e:
+                    logger.error(f"Error unsubscribing {username} from channel {channel}: {e}")
+                    # Force remove the subscription
+                    self.redis.srem(f"channel:{channel}:users", username)
+                    self.redis.srem(f"user:{username}:channels", channel)
+            
+            # Final cleanup - ensure all user data is removed
+            self.redis.delete(f"user:{username}:channels")
+            
+        except Exception as e:
+            logger.error(f"Error during disconnect cleanup for {username}: {e}")
+            # Attempt force cleanup
+            try:
+                self.local_connections.pop(username, None)
+                self.redis.hdel("user_servers", username)
+                self.redis.delete(f"user:{username}:channels")
+            except:
+                pass
 
     async def subscribe_to_channel(self, username: str, channel_id: str):
         """Subscribe a user to a channel"""
@@ -150,7 +176,25 @@ class RedisManager:
         """Periodic health check"""
         while True:
             try:
+                # Update server health
                 self.redis.setex(f"server_health:{self.server_id}", 30, "alive")
+                
+                # Check all local connections
+                for username, ws in list(self.local_connections.items()):
+                    try:
+                        # Try to ping the connection
+                        await ws.send_json({"type": "ping"})
+                    except Exception as e:
+                        logger.error(f"Connection dead for user {username}: {e}")
+                        await self.disconnect(username)
+                
+                # Clean up stale subscriptions
+                server_id = self.redis.hget("user_servers", username)
+                if server_id and server_id == self.server_id:
+                    if username not in self.local_connections:
+                        logger.warning(f"Cleaning up stale connection for user {username}")
+                        await self.disconnect(username)
+                
                 await asyncio.sleep(10)
             except Exception as e:
                 logger.error(f"Health check failed: {e}")

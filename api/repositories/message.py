@@ -1,60 +1,79 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
-from ..models.message import Message, MessageCreate
-from .base import BaseRepository
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from ..models.message import Message, MessageCreate, MessageDB
 from ..core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
 
-class MessageRepository(BaseRepository[Message]):
-    _instance = None
-    _initialized = False
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
-        if not self._initialized:
-            super().__init__()
-            self._initialized = True
-            logger.info("Initialized MessageRepository singleton")
+class MessageRepository:
+    def __init__(self, db: Session):
+        self.db = db
 
     def add_message(self, message: MessageCreate) -> Message:
         # Create a dict with all the required fields
         message_dict = message.model_dump()
         message_dict.update({
             'id': str(uuid.uuid4()),
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc)
         })
         
-        # Create the message using the dict
-        new_message = Message(**message_dict)
-        self._items.append(new_message)
+        # Create the database model
+        db_message = MessageDB(**message_dict)
+        self.db.add(db_message)
+        self.db.commit()
+        self.db.refresh(db_message)
         
-        # Keep only last N messages
-        if len(self._items) > settings.MAX_MESSAGES:
-            self._items.pop(0)
-            
-        logger.info(f"Added new message: {new_message}")
-        logger.info(f"Total messages in repository: {len(self._items)}")
-        return new_message
+        logger.info(f"Added new message: {db_message.id}")
+        return Message.model_validate(db_message)
 
-    def get_recent_messages(self) -> List[Message]:
-        messages = self._items[-settings.MAX_MESSAGES:]
+    def get_recent_messages(self, limit: int = None) -> List[Message]:
+        """Get recent messages, optionally limited to a number"""
+        if limit is None:
+            limit = settings.MAX_MESSAGES
+
+        messages = (
+            self.db.query(MessageDB)
+            .order_by(desc(MessageDB.timestamp))
+            .limit(limit)
+            .all()
+        )
         logger.info(f"Retrieving {len(messages)} recent messages")
-        return messages
+        return [Message.model_validate(msg) for msg in messages]
 
-    def get_user_messages(self, user_id: str) -> List[Message]:
-        """Get all messages from a specific user"""
-        messages = [msg for msg in self._items if msg.user_id == user_id]
-        logger.info(f"Retrieved {len(messages)} messages for user {user_id}")
-        return messages
+    def get_channel_messages(self, channel_id: str, limit: int = None) -> List[Message]:
+        """Get messages for a specific channel"""
+        if limit is None:
+            limit = settings.MAX_MESSAGES
+
+        messages = (
+            self.db.query(MessageDB)
+            .filter(MessageDB.channel_id == channel_id)
+            .order_by(desc(MessageDB.timestamp))
+            .limit(limit)
+            .all()
+        )
+        return [Message.model_validate(msg) for msg in messages]
+
+    def get_user_messages(self, user_id: str, limit: int = None) -> List[Message]:
+        """Get messages from a specific user"""
+        if limit is None:
+            limit = settings.MAX_MESSAGES
+
+        messages = (
+            self.db.query(MessageDB)
+            .filter(MessageDB.user_id == user_id)
+            .order_by(desc(MessageDB.timestamp))
+            .limit(limit)
+            .all()
+        )
+        return [Message.model_validate(msg) for msg in messages]
 
     def clear_messages(self):
-        """Clear all messages from the repository"""
-        logger.info("Clearing all messages from repository")
-        self._items = [] 
+        """Clear all messages - used for testing"""
+        self.db.query(MessageDB).delete()
+        self.db.commit()
+        logger.info("Cleared all messages") 

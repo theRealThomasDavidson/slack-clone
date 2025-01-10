@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import ChatWindow from '../components/chat/ChatWindow';
 import { API_BASE_URL } from '../contexts/BackendConfig';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
 
 interface Channel {
   id: string;
@@ -10,17 +9,23 @@ interface Channel {
   description: string;
   created_by: string;
   members: string[];
+  channel_type: "public" | "private";
+  member_exceptions: { [key: string]: "allowed" | "banned" };
 }
 
 const Chat: React.FC = () => {
   const [currentChannel, setCurrentChannel] = useState('general');
+  const [currentChannelId, setCurrentChannelId] = useState<string>('');
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelDescription, setNewChannelDescription] = useState('');
   const [channels, setChannels] = useState<Channel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { token, user } = useAuth();
-  const { isConnected } = useWebSocket();
+  const [error, setError] = useState<string | null>(null);
+  const [showModeration, setShowModeration] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [bannedUsers, setBannedUsers] = useState<any[]>([]);
 
   const fetchChannels = async () => {
     if (!token) return;
@@ -54,10 +59,24 @@ const Chat: React.FC = () => {
     }
   }, [token]);
 
+  // Update currentChannelId when channels or currentChannel changes
+  useEffect(() => {
+    const channel = channels.find(c => c.name === currentChannel);
+    if (channel) {
+      setCurrentChannelId(channel.id);
+    } else if (channels.length > 0) {
+      // If current channel not found but channels exist, set to first channel
+      const defaultChannel = channels.find(c => c.name === 'general') || channels[0];
+      setCurrentChannel(defaultChannel.name);
+      setCurrentChannelId(defaultChannel.id);
+    }
+  }, [channels, currentChannel]);
+
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token || !newChannelName.trim()) return;
 
+    setError(null); // Clear any previous errors
     try {
       const response = await fetch(`${API_BASE_URL}/channels/`, {
         method: 'POST',
@@ -71,26 +90,36 @@ const Chat: React.FC = () => {
         })
       });
 
+      const data = await response.json();
       if (response.ok) {
-        const channel = await response.json();
         await fetchChannels();
-        setCurrentChannel(channel.name);
+        setCurrentChannel(data.name);
         setShowCreateChannel(false);
         setNewChannelName('');
         setNewChannelDescription('');
       } else {
-        console.error('Failed to create channel:', await response.text());
+        setError(data.detail || 'Failed to create channel');
       }
     } catch (error) {
       console.error('Error creating channel:', error);
+      setError('Failed to create channel. Please try again.');
     }
   };
 
-  const handleJoinChannel = async (channelName: string) => {
+  const handleJoinChannel = async (channelId: string) => {
+    // Simply switch to the channel
+    const targetChannel = channels.find((c: Channel) => c.id === channelId);
+    if (targetChannel) {
+      setCurrentChannel(targetChannel.name);
+      setCurrentChannelId(targetChannel.id);
+    }
+  };
+
+  const handleLeaveChannel = async (channelId: string) => {
     if (!token) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/${channelName}/join`, {
+      const response = await fetch(`${API_BASE_URL}/channels/${channelId}/leave`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -98,26 +127,8 @@ const Chat: React.FC = () => {
       });
       if (response.ok) {
         await fetchChannels();
-        setCurrentChannel(channelName);
-      }
-    } catch (error) {
-      console.error('Error joining channel:', error);
-    }
-  };
-
-  const handleLeaveChannel = async (channelName: string) => {
-    if (!token) return;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/channels/${channelName}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        await fetchChannels();
-        if (currentChannel === channelName) {
+        const channel = channels.find(c => c.id === channelId);
+        if (currentChannel === channel?.name) {
           setCurrentChannel('general');
         }
       }
@@ -126,28 +137,75 @@ const Chat: React.FC = () => {
     }
   };
 
+  const handleBanUser = async (channelName: string, userId: string) => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/channels/${channelName}/ban/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        await fetchChannels();
+      }
+    } catch (error) {
+      console.error('Error banning user:', error);
+    }
+  };
+
+  const handleUnbanUser = async (channelName: string, userId: string) => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/channels/${channelName}/unban/${userId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        await fetchChannels();
+      }
+    } catch (error) {
+      console.error('Error unbanning user:', error);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r">
-        <div className="p-4 border-b">
+      <div className="w-64 bg-white border-r flex flex-col h-full">
+        <div className="p-4 border-b flex-shrink-0">
           <h2 className="text-lg font-semibold mb-4">Channels</h2>
           <button
-            onClick={() => setShowCreateChannel(true)}
+            onClick={() => {
+              console.log('Create Channel button clicked');
+              setShowCreateChannel(true);
+            }}
             className="w-full py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-            disabled={!isConnected}
           >
             Create Channel
           </button>
         </div>
 
+        {error && (
+          <div className="p-4 text-red-500 bg-red-100 border-b border-red-200 flex-shrink-0">
+            {error}
+          </div>
+        )}
+
         {showCreateChannel && (
-          <div className="p-4 border-b">
+          <div className="p-4 border-b flex-shrink-0">
             <form onSubmit={handleCreateChannel}>
               <input
                 type="text"
                 value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
+                onChange={(e) => {
+                  console.log('Channel name changed:', e.target.value);
+                  setNewChannelName(e.target.value);
+                }}
                 placeholder="Channel name"
                 className="w-full p-2 mb-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -161,7 +219,7 @@ const Chat: React.FC = () => {
               <div className="flex space-x-2">
                 <button
                   type="submit"
-                  disabled={!isConnected || !newChannelName.trim()}
+                  disabled={!newChannelName.trim()}
                   className="flex-1 py-1 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   Create
@@ -178,62 +236,39 @@ const Chat: React.FC = () => {
           </div>
         )}
 
-        <div className="p-2 space-y-1">
-          {isLoading ? (
-            <div className="text-center py-4 text-gray-500">Loading channels...</div>
-          ) : channels.map((channel) => {
-            const isCurrentChannel = currentChannel === channel.name;
-            const isMember = channel.members.includes(user?.id || '');
-            const isOwner = channel.created_by === user?.id;
-            const isDefaultChannel = channel.name === 'general' || channel.name === 'random';
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-2 space-y-1">
+            {isLoading ? (
+              <div className="text-center py-4 text-gray-500">Loading channels...</div>
+            ) : channels.map((channel) => {
+              const isCurrentChannel = currentChannel === channel.name;
+              const isDefaultChannel = channel.name === 'general' || channel.name === 'random';
 
-            return (
-              <div
-                key={channel.id}
-                className={`rounded ${isCurrentChannel ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
-              >
-                <div className="p-2 flex items-center justify-between">
-                  <button
-                    onClick={() => isMember ? setCurrentChannel(channel.name) : handleJoinChannel(channel.name)}
-                    className="text-left flex-1"
-                    disabled={!isConnected}
-                  >
-                    <div className="font-medium">#{channel.name}</div>
-                    <div className="text-sm text-gray-500">{channel.description}</div>
-                  </button>
-                  {!isDefaultChannel && (
-                    <div className="ml-2">
-                      {!isMember && (
-                        <button
-                          onClick={() => handleJoinChannel(channel.name)}
-                          disabled={!isConnected}
-                          className="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                          Join
-                        </button>
-                      )}
-                      {isMember && !isOwner && (
-                        <button
-                          onClick={() => handleLeaveChannel(channel.name)}
-                          disabled={!isConnected}
-                          className="px-2 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                          Leave
-                        </button>
-                      )}
-                    </div>
-                  )}
+              return (
+                <div
+                  key={channel.id}
+                  className={`rounded ${isCurrentChannel ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                >
+                  <div className="p-2 flex items-center justify-between">
+                    <button
+                      onClick={() => handleJoinChannel(channel.id)}
+                      className="text-left flex-1"
+                    >
+                      <div className="font-medium">#{channel.name}</div>
+                      <div className="text-sm text-gray-500">{channel.description}</div>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Main Chat Area */}
       <div className="flex-1">
         <div className="h-full">
-          <ChatWindow channelId={currentChannel} />
+          <ChatWindow channelId={currentChannelId} />
         </div>
       </div>
     </div>
