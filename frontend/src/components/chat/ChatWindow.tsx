@@ -21,6 +21,8 @@ interface MessageData {
   created_at: string;
   emojis: { [key: string]: string[] };
   file: FileInfo | null;
+  parent_id: string | null;
+  replies_count: number;
 }
 
 interface ChatWindowProps {
