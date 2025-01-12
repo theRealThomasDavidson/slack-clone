@@ -55,7 +55,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
       setMessages(data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching messages:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch messages');
     }
   };
@@ -65,7 +64,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
       await api.addReaction(channelId, messageId, emoji);
       await fetchMessages();
     } catch (err) {
-      console.error('Error adding reaction:', err);
       setError('Failed to add reaction');
     }
   };
@@ -75,7 +73,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
       await api.removeReaction(channelId, messageId, emoji);
       await fetchMessages();
     } catch (err) {
-      console.error('Error removing reaction:', err);
       setError('Failed to remove reaction');
     }
   };
@@ -89,8 +86,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
   }, [channelId, token]);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-800">
+      {/* Channel header */}
+      <div className="p-4 border-b border-gray-700">
+        <h2 className="text-lg font-semibold text-white">#{channelId}</h2>
+      </div>
+
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto">
         {error ? (
           <div className="text-red-500 p-4">{error}</div>
         ) : (
@@ -102,10 +105,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
           />
         )}
       </div>
-      <MessageInput 
-        channelId={channelId} 
-        onMessageSent={fetchMessages}
-      />
+
+      {/* Message input */}
+      <div className="border-t border-gray-700">
+        <MessageInput 
+          channelId={channelId} 
+          onMessageSent={fetchMessages}
+        />
+      </div>
     </div>
   );
 };

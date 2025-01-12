@@ -106,7 +106,7 @@ const Message: React.FC<MessageProps> = ({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      alert('Failed to download file. Please try again.');
     }
   };
 

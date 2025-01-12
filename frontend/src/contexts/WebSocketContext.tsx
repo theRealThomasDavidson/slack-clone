@@ -49,7 +49,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!token) return;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/${channelName}/messages`, {
+      // Handle both regular channels and DM channels
+      const endpoint = channelName.startsWith('dm-') 
+        ? `${API_BASE_URL}/messages/dm/${channelName.slice(3)}` 
+        : `${API_BASE_URL}/messages/channel/${channelName}`;
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

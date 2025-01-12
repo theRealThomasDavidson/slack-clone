@@ -15,6 +15,9 @@ interface ApiContextType {
   joinChannel: (channelId: string) => Promise<void>;
   leaveChannel: (channelId: string) => Promise<void>;
 
+  // Users
+  getUsers: () => Promise<any[]>;
+
   // Files
   uploadFile: (file: File, channelId: string) => Promise<any>;
   downloadFile: (fileId: string) => Promise<Blob>;
@@ -116,6 +119,12 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await fetchApi(`/channels/${channelId}/leave`, {
         method: 'POST',
       });
+    },
+
+    // Users
+    getUsers: async () => {
+      const response = await fetchApi('/users');
+      return response.json();
     },
 
     // Files

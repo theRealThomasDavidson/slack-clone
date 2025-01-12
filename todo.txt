@@ -39,11 +39,11 @@
    - [ ] Add loading state during channel creation
 
 4. User Display
-   - [ ] Create UserList component under channels
-   - [ ] Add online/offline status indicators
+   - [x] Create UserList component under channels
+   - [x] Add online/offline status indicators
+   - [x] Style user list entries
    - [ ] Implement user search/filter
-   - [ ] Add user presence system
-   - [ ] Style user list entries
+   - [x] Add user presence system
    - [ ] Add user profile previews
 
 5. Direct Messages
@@ -54,10 +54,10 @@
      - [ ] Add DM list endpoint
 
    - Frontend Changes
-     - [ ] Add DM initiation from user list
-     - [ ] Create DM channel list component
-     - [ ] Implement DM chat interface
-     - [ ] Add DM-specific styling
+     - [x] Add DM initiation from user list
+     - [x] Create DM channel list component
+     - [x] Implement DM chat interface
+     - [x] Add DM-specific styling
 
 6. Deployment
    - [ ] Update Docker configurations
@@ -66,3 +66,26 @@
    - [ ] Set up SSL certificates
    - [ ] Configure database backups
    - [ ] Set up monitoring 
+
+Current State (2024-03-19):
+- Completed User Display and DM integration
+- Added system user filtering
+- Improved error handling with retry delays
+
+Next Steps:
+1. User Display:
+   - Add user search/filter functionality
+   - Add user profile previews
+   - Improve user presence system
+
+2. Direct Messages:
+   - Add API endpoints for DMs
+   - Create DM UI components
+   - Implement DM functionality
+   - Add DM notifications
+
+3. Deployment:
+   - Set up production environment
+   - Configure deployment pipeline
+   - Set up monitoring
+   - Add error tracking 
