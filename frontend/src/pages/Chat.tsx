@@ -15,9 +15,16 @@ interface Channel {
 
 const Chat: React.FC = () => {
   const [currentChannelId, setCurrentChannelId] = useState<string>('');
+  const [activeDmUserId, setActiveDmUserId] = useState<string>('');
 
   const handleChannelSelect = (channelId: string) => {
     setCurrentChannelId(channelId);
+    // If it's a DM channel, extract the user ID
+    if (channelId.startsWith('dm-')) {
+      setActiveDmUserId(channelId.replace('dm-', ''));
+    } else {
+      setActiveDmUserId('');
+    }
   };
 
   return (
@@ -28,6 +35,7 @@ const Chat: React.FC = () => {
           <ChannelList 
             onChannelSelect={handleChannelSelect}
             selectedChannelId={currentChannelId}
+            activeDmUserId={activeDmUserId}
           />
         </div>
       </div>

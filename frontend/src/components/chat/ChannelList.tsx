@@ -16,18 +16,20 @@ interface Channel {
 interface User {
   id: string;
   username: string;
-  email: string;
+  online_status: boolean;
 }
 
 interface ChannelListProps {
   onChannelSelect: (channelId: string) => void;
   selectedChannelId?: string;
+  activeDmUserId?: string;
   children?: React.ReactNode;
 }
 
 export const ChannelList: React.FC<ChannelListProps> = ({ 
   onChannelSelect, 
   selectedChannelId,
+  activeDmUserId,
   children 
 }) => {
   const api = useApi();
@@ -248,8 +250,16 @@ export const ChannelList: React.FC<ChannelListProps> = ({
 
       <div className="flex-1 overflow-y-auto">
         {/* Channels Section */}
-        <div className="p-4">
-          <h2 className="text-white text-lg font-semibold mb-2">Channels</h2>
+        <div className="p-4 border-b border-gray-700">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-lg font-semibold text-white">Channels</h2>
+            <button
+              onClick={() => setShowCreateChannel(true)}
+              className="text-gray-400 hover:text-white"
+            >
+              +
+            </button>
+          </div>
           {channels.map(channel => (
             <div
               key={channel.id}
@@ -267,9 +277,12 @@ export const ChannelList: React.FC<ChannelListProps> = ({
         </div>
 
         {/* Users Section */}
-        <div className="p-4 border-t border-gray-700">
-          <h2 className="text-white text-lg font-semibold mb-2">Direct Messages</h2>
-          <UserList onUserClick={handleUserClick} />
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-lg font-semibold text-white mb-2">Direct Messages</h2>
+          <UserList 
+            onUserClick={handleUserClick}
+            activeDmUserId={activeDmUserId}
+          />
         </div>
       </div>
     </div>
