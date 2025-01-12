@@ -40,6 +40,39 @@ async def get_channels(
     """Get all public channels."""
     return await ChannelService.get_channels(db)
 
+@router.get("/dm/{target_username}")
+async def create_or_get_dm_channel(
+    target_username: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a DM channel with another user or get existing one."""
+    # Get target user and verify existence
+    result = await db.execute(select(User).where(User.username == target_username))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User {target_username} not found")
+
+    # Generate DM channel name (alphabetically sorted usernames)
+    channel_name = f"DM_{sorted([current_user.username, target_username])[0]}_{sorted([current_user.username, target_username])[1]}"
+    
+    # Check if channel exists in user's channels
+    user_channels = await ChannelService.get_user_channels(db, current_user)
+    existing_channel = next((c for c in user_channels if c.name == channel_name), None)
+    
+    if existing_channel:
+        return existing_channel
+        
+    # Create new DM channel if it doesn't exist
+    return await ChannelService.create_channel(
+        db=db,
+        name=channel_name,
+        description=f"Direct messages between {current_user.username} and {target_username}",
+        created_by_user=current_user,
+        is_private=True,
+        members=[current_user, target_user]
+    )
+
 @router.get("/me", response_model=List[Channel])
 async def get_my_channels(
     current_user: User = Depends(get_current_user),

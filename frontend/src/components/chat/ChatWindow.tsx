@@ -32,6 +32,7 @@ interface ChatWindowProps {
 const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState<string>('');
   const api = useApi();
   const { token } = useAuth();
 
@@ -39,7 +40,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
     if (!token) return;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/messages/channel/${channelId}`, {
+      let endpoint;
+      const channelIdStr = String(channelId);
+      if (channelIdStr.startsWith('dm-')) {
+        const targetUserId = channelIdStr.replace('dm-', '');
+        endpoint = `${API_BASE_URL}/messages/dm/${targetUserId}`;
+      } else {
+        endpoint = `${API_BASE_URL}/messages/channel/${channelId}`;
+      }
+
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -58,6 +68,43 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
       setError(err instanceof Error ? err.message : 'Failed to fetch messages');
     }
   };
+
+  // Fetch channel name
+  useEffect(() => {
+    const fetchChannelName = async () => {
+      if (!token || !channelId) return;
+
+      try {
+        const channelIdStr = String(channelId);
+        if (channelIdStr.startsWith('dm-')) {
+          const targetUserId = channelIdStr.replace('dm-', '');
+          const response = await fetch(`${API_BASE_URL}/users/${targetUserId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const user = await response.json();
+            setChannelName(`@${user.username}`);
+          }
+        } else {
+          const response = await fetch(`${API_BASE_URL}/channels/${channelId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const channel = await response.json();
+            setChannelName(`#${channel.name}`);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch channel/user name:', err);
+      }
+    };
+
+    fetchChannelName();
+  }, [channelId, token]);
 
   const handleAddReaction = async (channelId: string, messageId: string, emoji: string) => {
     try {
@@ -89,7 +136,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
     <div className="flex flex-col h-full bg-gray-800">
       {/* Channel header */}
       <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white">#{channelId}</h2>
+        <h2 className="text-lg font-semibold text-white">{channelName || 'Loading...'}</h2>
       </div>
 
       {/* Messages area */}

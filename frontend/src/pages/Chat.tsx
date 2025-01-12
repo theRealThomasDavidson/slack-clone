@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ChatWindow from '../components/chat/ChatWindow';
 import ChannelList from '../components/chat/ChannelList';
-import UserList from '../components/chat/UserList';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Channel {
@@ -10,7 +9,7 @@ interface Channel {
   description: string;
   created_by: string;
   members: string[];
-  channel_type: "public" | "private";
+  channel_type: "public" | "private" | "dm";
   member_exceptions: { [key: string]: "allowed" | "banned" };
 }
 
@@ -31,11 +30,6 @@ const Chat: React.FC = () => {
             selectedChannelId={currentChannelId}
           />
         </div>
-        <div className="border-t border-gray-700 h-48">
-          <div className="h-full overflow-y-auto">
-            <UserList />
-          </div>
-        </div>
       </div>
 
       {/* Main chat area */}
@@ -44,7 +38,7 @@ const Chat: React.FC = () => {
           <ChatWindow channelId={currentChannelId} />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-400">
-            Select a channel to start chatting
+            Select a channel or user to start chatting
           </div>
         )}
       </div>

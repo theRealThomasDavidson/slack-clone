@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import joinedload
 import re
 
@@ -17,7 +17,7 @@ from ..models.tables.user import User
 from ..models.tables.message import Message as MessageTable
 from ..models.tables.reaction import Reaction as ReactionTable
 from ..models.tables.file import File as FileTable
-from ..models.tables.channel import Channel as ChannelTable
+from ..models.tables.channel import Channel as ChannelTable, channel_members
 from ..models.message import Message, MessageCreate, FileInfo
 from ..routes.auth import get_current_user
 
@@ -30,45 +30,6 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-@router.post("/dm/{target_username}", response_model=Message)
-async def create_or_get_dm_channel(
-    target_username: str,
-    content: str = Form(...),
-    file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Create a DM channel with another user or get existing one, then send a message."""
-    # Get target user and verify existence
-    result = await db.execute(select(User).where(User.username == target_username))
-    target_user = result.scalar_one_or_none()
-    if not target_user:
-        raise HTTPException(status_code=404, detail=f"User {target_username} not found")
-
-    # Get or create DM channel
-    channel_name = f"DM_{sorted([current_user.username, target_username])[0]}_{sorted([current_user.username, target_username])[1]}"
-    result = await db.execute(select(ChannelTable).where(ChannelTable.name == channel_name))
-    channel = result.scalar_one_or_none()
-    
-    if not channel:
-        channel = ChannelTable(
-            name=channel_name,
-            description=f"Direct messages between {current_user.username} and {target_username}",
-            is_dm=True,
-            created_by=current_user.id,
-            members=[current_user.id, target_user.id]
-        )
-        db.add(channel)
-        await db.flush()
-
-    # Use existing message creation endpoint logic
-    return await create_message(
-        content=content,
-        channel_id=str(channel.id),
-        file=file,
-        current_user=current_user,
-        db=db
-    )
 
 def extract_file_id(content: str) -> Optional[str]:
     """Extract file ID from message content."""
@@ -438,3 +399,181 @@ async def get_thread_messages(
         response_messages.append(Message(**message_data))
     
     return response_messages 
+
+@router.get("/dm/{target_username}", response_model=List[Message])
+async def get_dm_messages(
+    target_username: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get messages from a DM channel with another user."""
+    # Get target user and verify existence
+    result = await db.execute(select(User).where(User.username == target_username))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User {target_username} not found")
+
+    # Get DM channel
+    channel_name = f"DM_{sorted([current_user.username, target_username])[0]}_{sorted([current_user.username, target_username])[1]}"
+    result = await db.execute(select(ChannelTable).where(ChannelTable.name == channel_name))
+    channel = result.scalar_one_or_none()
+    
+    if not channel:
+        return []  # Return empty list if no DM channel exists yet
+    
+    # Get messages from this channel
+    result = await db.execute(
+        select(MessageTable)
+        .where(MessageTable.channel_id == channel.id)
+        .order_by(MessageTable.created_at.desc())
+        .options(
+            joinedload(MessageTable.file),
+            joinedload(MessageTable.reactions).joinedload(ReactionTable.user)
+        )
+    )
+    messages = result.unique().scalars().all()
+    
+    # Format messages
+    formatted_messages = []
+    for message in messages:
+        # Get the message sender's username
+        user = await db.get(User, message.user_id)
+        username = user.username if user else "System"
+        
+        # Format file info if present
+        file_info = None
+        if message.file:
+            file_info = FileInfo(
+                id=str(message.file.id),
+                filename=message.file.filename,
+                size=message.file.size,
+                content_type=message.file.content_type
+            )
+        
+        # Format reactions
+        emoji_data = {}
+        for reaction in message.reactions:
+            if reaction.emoji not in emoji_data:
+                emoji_data[reaction.emoji] = []
+            if reaction.user:
+                emoji_data[reaction.emoji].append(reaction.user.username)
+        
+        # Create message object
+        formatted_message = Message(
+            id=message.id,
+            content=message.content,
+            channel_id=message.channel_id,
+            user_id=message.user_id,
+            username=username,
+            created_at=message.created_at,
+            updated_at=message.updated_at,
+            emojis=emoji_data,
+            file=file_info,
+            parent_id=message.parent_id
+        )
+        formatted_messages.append(formatted_message)
+    
+    return formatted_messages 
+
+@router.post("/dm/{target_username}")
+async def send_dm_message(
+    target_username: str,
+    content: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a direct message to another user."""
+    # First get or create the DM channel
+    result = await db.execute(select(User).where(User.username == target_username))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User {target_username} not found")
+
+    # Get DM channel
+    channel_name = f"DM_{sorted([current_user.username, target_username])[0]}_{sorted([current_user.username, target_username])[1]}"
+    result = await db.execute(select(ChannelTable).where(ChannelTable.name == channel_name))
+    channel = result.scalar_one_or_none()
+    
+    if not channel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="DM channel not found. Please create the channel first."
+        )
+
+    # Now create the message using the existing message creation logic
+    try:
+        # Handle file upload if present
+        db_file = None
+        if file:
+            contents = await file.read()
+            if len(contents) > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"File too large. Maximum size is {MAX_FILE_SIZE/1024/1024}MB"
+                )
+            
+            unique_filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
+            file_path = UPLOAD_DIR / unique_filename
+            
+            with open(file_path, "wb") as f:
+                f.write(contents)
+            
+            db_file = FileTable(
+                filename=file.filename,
+                filepath=str(file_path),
+                content_type=file.content_type,
+                size=len(contents),
+                user_id=current_user.id
+            )
+            db.add(db_file)
+            await db.flush()
+            
+            content = f"{content}\nUploaded file: {file.filename} ({len(contents)/1024:.1f} KB) [file:{db_file.id}]"
+        
+        # Create message
+        db_message = MessageTable(
+            content=content,
+            channel_id=channel.id,
+            user_id=current_user.id
+        )
+        db.add(db_message)
+        await db.flush()
+        
+        if db_file:
+            db_file.message_id = db_message.id
+        
+        await db.commit()
+        await db.refresh(db_message)
+        
+        # Prepare response
+        response_data = {
+            "id": db_message.id,
+            "content": db_message.content,
+            "channel_id": db_message.channel_id,
+            "user_id": db_message.user_id,
+            "created_at": db_message.created_at,
+            "updated_at": db_message.updated_at,
+            "username": current_user.username,
+            "emojis": {},
+            "file": None,
+            "parent_id": None
+        }
+        
+        if db_file:
+            response_data["file"] = {
+                "id": str(db_file.id),
+                "filename": db_file.filename,
+                "size": db_file.size,
+                "content_type": db_file.content_type
+            }
+        
+        return Message(**response_data)
+            
+    except Exception as e:
+        if 'file_path' in locals() and file_path.exists():
+            file_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        ) 

@@ -12,21 +12,29 @@ interface Channel {
   is_dm?: boolean;
 }
 
+interface User {
+  id: string;
+  username: string;
+  email: string;
+}
+
 interface ChannelListProps {
   onChannelSelect: (channelId: string) => void;
   selectedChannelId?: string;
   children?: React.ReactNode;
 }
 
-const ChannelList: React.FC<ChannelListProps> = ({ 
+export const ChannelList: React.FC<ChannelListProps> = ({ 
   onChannelSelect, 
   selectedChannelId,
   children 
 }) => {
-  const { token } = useAuth();
   const api = useApi();
+  const { user: currentUser } = useAuth();
+  const { token } = useAuth();
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [activeDMs, setActiveDMs] = useState<Set<string>>(new Set());
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -38,29 +46,21 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const RETRY_DELAY = 30000; // 30 seconds
 
   const fetchUsers = async () => {
-    // If there was an error in the last 30 seconds, skip this fetch
-    if (Date.now() - lastUserFetchError < RETRY_DELAY) {
-      return;
-    }
-
     try {
-      const usersData = await api.getUsers();
-      // Filter out system user and any users with invalid data
-      const validUsers = usersData.filter(user => 
+      const users = await api.getUsers();
+      const validUsers = users.filter(user => 
         user && 
-        user.id && 
         user.username && 
-        !user.email?.includes('@chat.local')
+        user.username !== currentUser?.username
       );
       setUsers(validUsers);
-      setLastUserFetchError(0); // Reset error state on success
+      setError(null);
     } catch (err) {
-      setLastUserFetchError(Date.now()); // Record time of error
-      // Keep existing users list
+      console.error('Failed to fetch users:', err);
+      setError('Failed to fetch users');
     }
   };
 
-  // Fetch channels with pagination
   const fetchChannels = async (pageNum: number, append: boolean = false) => {
     if (!token || isLoading) return;
     
@@ -77,24 +77,27 @@ const ChannelList: React.FC<ChannelListProps> = ({
       }
       
       const channelsData = await response.json();
+      
+      // Filter out DM channels from regular channels
+      const regularChannels = channelsData.filter((channel: Channel) => !channel.name.startsWith('DM_'));
 
-      // Only try to fetch users if we haven't had a recent error
       if (Date.now() - lastUserFetchError >= RETRY_DELAY) {
         await fetchUsers();
       }
 
-      // Convert users to channel-like objects
-      const userChannels = users.map(user => ({
-        id: `dm-${user.id}`,
-        name: user.username,
-        description: `Direct message with ${user.username}`,
-        owner_id: user.id,
-        members: [user.id],
-        is_dm: true
-      }));
+      // Convert users to channel-like objects for active DMs
+      const userChannels = users
+        .filter(user => activeDMs.has(user.username))
+        .map(user => ({
+          id: `dm-${user.id}`,
+          name: user.username,
+          description: `Direct message with ${user.username}`,
+          owner_id: user.id,
+          members: [user.id],
+          is_dm: true
+        }));
 
-      // Combine regular channels with user DM channels
-      const allChannels = [...channelsData, ...userChannels];
+      const allChannels = [...regularChannels, ...userChannels];
       
       setHasMore(channelsData.length === 20);
       setChannels(prev => append ? [...prev, ...allChannels] : allChannels);
@@ -106,30 +109,22 @@ const ChannelList: React.FC<ChannelListProps> = ({
     }
   };
 
-  // Set up polling interval
   useEffect(() => {
     if (token) {
-      // Initial fetch
       fetchChannels(1, false);
-
-      // Set up polling every 10 seconds
       const interval = setInterval(() => {
         fetchChannels(1, false);
       }, 10000);
-
-      // Cleanup interval on unmount
       return () => clearInterval(interval);
     }
   }, [token]);
 
-  // Handle pagination
   useEffect(() => {
     if (token && page > 1) {
       fetchChannels(page, true);
     }
   }, [token, page]);
 
-  // Intersection observer for infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
     const target = entries[0];
     if (target.isIntersecting && hasMore && !isLoading) {
@@ -171,14 +166,36 @@ const ChannelList: React.FC<ChannelListProps> = ({
         throw new Error(errorData.detail || 'Failed to create channel');
       }
 
-      // Refresh the channels list
       await fetchChannels(1, false);
-      
-      // Reset form
       setShowCreateChannel(false);
       setNewChannelName('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
+    }
+  };
+
+  const handleUserClick = async (user: User) => {
+    try {
+      // Create or get DM channel using GET endpoint
+      const response = await fetch(`${API_BASE_URL}/channels/dm/${user.username}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create/get DM channel');
+      }
+
+      const channel = await response.json();
+      
+      // Add user to active DMs and select the channel using username
+      setActiveDMs(prev => new Set([...prev, user.username]));
+      onChannelSelect(`dm-${user.username}`); // Use username instead of ID
+    } catch (error) {
+      console.error('Error creating DM channel:', error);
+      setError('Failed to start DM conversation');
     }
   };
 
@@ -212,14 +229,14 @@ const ChannelList: React.FC<ChannelListProps> = ({
             <div className="flex space-x-2">
               <button
                 type="submit"
-                className="flex-1 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                className="flex-1 py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Create
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreateChannel(false)}
-                className="flex-1 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                className="py-2 px-4 bg-gray-600 text-white rounded hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -228,40 +245,47 @@ const ChannelList: React.FC<ChannelListProps> = ({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-        <div className="space-y-1">
-          {channels.map((channel) => (
+      <div className="flex-1 overflow-y-auto">
+        {/* Channels Section */}
+        <div className="p-4">
+          <h2 className="text-gray-400 text-sm font-semibold mb-2">Channels</h2>
+          {channels
+            .filter(channel => !channel.is_dm)
+            .map(channel => (
+              <button
+                key={channel.id}
+                onClick={() => onChannelSelect(channel.id)}
+                className={`w-full text-left p-2 rounded mb-1 ${
+                  selectedChannelId === channel.id
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                # {channel.name}
+              </button>
+            ))}
+        </div>
+
+        {/* Direct Messages Section */}
+        <div className="p-4 border-t border-gray-700">
+          <h2 className="text-gray-400 text-sm font-semibold mb-2">Direct Messages</h2>
+          {users.map(user => (
             <button
-              key={channel.id}
-              onClick={() => onChannelSelect(channel.id)}
-              className={`w-full p-4 text-left hover:bg-gray-700 transition-colors ${
-                selectedChannelId === channel.id ? 'bg-gray-700' : ''
+              key={user.id}
+              onClick={() => handleUserClick(user)}
+              className={`w-full text-left p-2 rounded mb-1 ${
+                selectedChannelId === `dm-${user.username}` // Use username instead of ID
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:bg-gray-700 hover:text-white'
               }`}
             >
-              <div className="text-white font-medium">
-                {channel.is_dm ? (
-                  <span className="flex items-center gap-2">
-                    <span className="text-gray-400">👤</span>
-                    {channel.name}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <span className="text-gray-400">#</span>
-                    {channel.name}
-                  </span>
-                )}
-              </div>
-              <div className="text-gray-400 text-sm">{channel.description}</div>
+              @ {user.username}
             </button>
           ))}
-          {isLoading && (
-            <div className="text-center p-4 text-gray-400">
-              Loading more channels...
-            </div>
-          )}
-          <div ref={loader} />
         </div>
       </div>
+
+      <div ref={loader} className="h-4" />
     </div>
   );
 };

@@ -47,16 +47,16 @@
 
 5. Direct Messages
    - API Changes
-     - [ ] Add DM channel creation endpoint
-     - [ ] Modify channel queries to handle DMs
-     - [ ] Add participant management endpoints
-     - [ ] Add DM list endpoint
+     - [x] Add DM channel creation endpoint
+     - [x] Modify channel queries to handle DMs
+     - [x] Add participant management endpoints
+     - [x] Add DM list endpoint
 
    - Frontend Changes
-     - [ ] Add DM initiation from user list
-     - [ ] Create DM channel list component
-     - [ ] Implement DM chat interface
-     - [ ] Add DM-specific styling
+     - [x] Add DM initiation from user list
+     - [x] Create DM channel list component
+     - [x] Implement DM chat interface
+     - [x] Add DM-specific styling
 
 6. Deployment
    - [ ] Update Docker configurations
@@ -67,7 +67,7 @@
    - [ ] Set up monitoring 
 
 Current State (2024-03-19):
-- Completed User Display and DM integration
+- Completed Thread Support, Scrollbars, Channel Management, and Direct Messages
 - Added system user filtering
 - Improved error handling with retry delays
 
@@ -77,13 +77,7 @@ Next Steps:
    - Add user profile previews
    - Improve user presence system
 
-2. Direct Messages:
-   - Add API endpoints for DMs
-   - Create DM UI components
-   - Implement DM functionality
-   - Add DM notifications
-
-3. Deployment:
+2. Deployment:
    - Set up production environment
    - Configure deployment pipeline
    - Set up monitoring

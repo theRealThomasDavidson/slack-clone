@@ -77,31 +77,87 @@ const MessageInput: React.FC<MessageInputProps> = ({
       setIsSending(true);
       setError(null);
       try {
-        // Create FormData and append message content and IDs
-        const formData = new FormData();
-        formData.append('content', message.trim());
-        if (channelId) formData.append('channel_id', channelId);
-        if (parentId) formData.append('parent_id', parentId);
+        // Handle both regular channels and DM channels
+        if (channelId) {
+          const channelIdStr = String(channelId);
+          if (channelIdStr.startsWith('dm-')) {
+            // For DM channels, get the target username from the channel name
+            const targetUser = await fetch(`${API_BASE_URL}/users/${channelIdStr.replace('dm-', '')}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }).then(res => res.json());
 
-        // If there are files, append the first one
-        if (selectedFiles.length > 0) {
-          formData.append('file', selectedFiles[0]);
-        }
+            if (!targetUser || !targetUser.username) {
+              throw new Error('Could not find target user');
+            }
 
-        // Send message with optional file
-        const response = await fetch(`${API_BASE_URL}/messages/`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
+            // First get/create the DM channel
+            const channelResponse = await fetch(`${API_BASE_URL}/channels/dm/${targetUser.username}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          throw new Error(
-            errorData?.detail || `API error: ${response.status} ${response.statusText}`
-          );
+            if (!channelResponse.ok) {
+              const errorData = await channelResponse.json().catch(() => null);
+              throw new Error(
+                errorData?.detail || `Failed to get/create DM channel: ${channelResponse.status} ${channelResponse.statusText}`
+              );
+            }
+
+            const channel = await channelResponse.json();
+
+            // Now send the message to the channel
+            const formData = new FormData();
+            formData.append('content', message.trim());
+            formData.append('channel_id', channel.id.toString());
+            if (selectedFiles.length > 0) {
+              formData.append('file', selectedFiles[0]);
+            }
+
+            const response = await fetch(`${API_BASE_URL}/messages/`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              body: formData
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => null);
+              throw new Error(
+                errorData?.detail || `API error: ${response.status} ${response.statusText}`
+              );
+            }
+          } else {
+            // For regular channels, use the existing channel message endpoint
+            const formData = new FormData();
+            formData.append('content', message.trim());
+            formData.append('channel_id', channelId);
+            if (parentId) formData.append('parent_id', parentId);
+
+            // If there are files, append the first one
+            if (selectedFiles.length > 0) {
+              formData.append('file', selectedFiles[0]);
+            }
+
+            const response = await fetch(`${API_BASE_URL}/messages/`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              },
+              body: formData
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => null);
+              throw new Error(
+                errorData?.detail || `API error: ${response.status} ${response.statusText}`
+              );
+            }
+          }
         }
 
         // Clear form after successful send

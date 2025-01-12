@@ -20,7 +20,8 @@ class ChannelService:
         name: str,
         description: str | None = None,
         created_by_user: User = None,
-        is_private: bool = False
+        is_private: bool = False,
+        members: List[User] = None
     ) -> Channel:
         """Create a new channel."""
         try:
@@ -41,8 +42,16 @@ class ChannelService:
             db.add(channel)
             await db.flush()  # Flush to get the channel ID
             
-            # Add creator as member only for private channels
-            if created_by_user and is_private:
+            # Add members if provided, otherwise just add creator for private channels
+            if members:
+                for member in members:
+                    await db.execute(
+                        channel_members.insert().values(
+                            channel_id=channel.id,
+                            user_id=member.id
+                        )
+                    )
+            elif created_by_user and is_private:
                 await db.execute(
                     channel_members.insert().values(
                         channel_id=channel.id,
@@ -81,9 +90,11 @@ class ChannelService:
 
     @staticmethod
     async def get_channels(db: AsyncSession) -> List[Channel]:
-        """Get all public channels."""
+        """Get all public channels, excluding DM channels."""
         result = await db.execute(
-            select(Channel).filter(Channel.is_private == False)
+            select(Channel)
+            .filter(Channel.is_private == False)
+            .filter(~Channel.name.startswith('DM_'))  # Exclude DM channels
         )
         return list(result.scalars().all())
 
