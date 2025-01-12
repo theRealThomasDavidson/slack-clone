@@ -17,6 +17,7 @@ from ..models.tables.user import User
 from ..models.tables.message import Message as MessageTable
 from ..models.tables.reaction import Reaction as ReactionTable
 from ..models.tables.file import File as FileTable
+from ..models.tables.channel import Channel as ChannelTable
 from ..models.message import Message, MessageCreate, FileInfo
 from ..routes.auth import get_current_user
 
@@ -28,6 +29,46 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+@router.post("/dm/{target_username}", response_model=Message)
+async def create_or_get_dm_channel(
+    target_username: str,
+    content: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a DM channel with another user or get existing one, then send a message."""
+    # Get target user and verify existence
+    result = await db.execute(select(User).where(User.username == target_username))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User {target_username} not found")
+
+    # Get or create DM channel
+    channel_name = f"DM_{sorted([current_user.username, target_username])[0]}_{sorted([current_user.username, target_username])[1]}"
+    result = await db.execute(select(ChannelTable).where(ChannelTable.name == channel_name))
+    channel = result.scalar_one_or_none()
+    
+    if not channel:
+        channel = ChannelTable(
+            name=channel_name,
+            description=f"Direct messages between {current_user.username} and {target_username}",
+            is_dm=True,
+            created_by=current_user.id,
+            members=[current_user.id, target_user.id]
+        )
+        db.add(channel)
+        await db.flush()
+
+    # Use existing message creation endpoint logic
+    return await create_message(
+        content=content,
+        channel_id=str(channel.id),
+        file=file,
+        current_user=current_user,
+        db=db
+    )
 
 def extract_file_id(content: str) -> Optional[str]:
     """Extract file ID from message content."""
