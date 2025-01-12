@@ -78,7 +78,7 @@ const Chat: React.FC = () => {
 
     setError(null); // Clear any previous errors
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/`, {
+      const response = await fetch(`${API_BASE_URL}/channels`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

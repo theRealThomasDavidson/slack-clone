@@ -37,7 +37,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
     
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/?page=${pageNum}&limit=20`, {
+      const response = await fetch(`${API_BASE_URL}/channels?page=${pageNum}&limit=20`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -90,7 +90,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/`, {
+      const response = await fetch(`${API_BASE_URL}/channels`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -98,7 +98,8 @@ const ChannelList: React.FC<ChannelListProps> = ({
         },
         body: JSON.stringify({
           name: newChannelName,
-          description: `${newChannelName} channel`
+          description: `${newChannelName} channel`,
+          is_private: false
         })
       });
 
