@@ -51,6 +51,8 @@ interface MessageProps {
   file?: FileInfo | null;
   onAddReaction: (channelId: string, messageId: string, emoji: string) => void;
   onRemoveReaction: (channelId: string, messageId: string, emoji: string) => void;
+  onReply?: (messageId: string) => void;
+  repliesCount?: number;
 }
 
 const Message: React.FC<MessageProps> = ({
@@ -63,7 +65,9 @@ const Message: React.FC<MessageProps> = ({
   emojis,
   file,
   onAddReaction,
-  onRemoveReaction
+  onRemoveReaction,
+  onReply,
+  repliesCount
 }) => {
   const { user, token } = useAuth();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -142,51 +146,70 @@ const Message: React.FC<MessageProps> = ({
           )}
         </div>
 
-        {/* Reactions container */}
+        {/* Actions container */}
         <div className="mt-1 flex flex-col items-start gap-1">
-          {/* Existing reactions */}
-          {Object.keys(emojis).length > 0 && (
-            <div className="flex flex-wrap gap-1 ml-2">
-              {Object.entries(emojis).map(([emoji, users]) => (
-                <button
-                  key={emoji}
-                  onClick={() => handleReactionClick(emoji)}
-                  title={users.join(', ')}
-                  className={`
-                    px-1.5 py-0.5 rounded-md text-sm flex items-center gap-1
-                    ${users.includes(user?.username || '')
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : 'bg-gray-100 text-gray-800 border border-gray-200'
-                    }
-                    hover:scale-105 transform transition-all duration-150
-                    hover:shadow-sm
-                    active:scale-95
-                  `}
-                >
-                  <span className="select-none">{emoji}</span>
-                  {users.length > 1 && (
-                    <span className="text-xs font-medium">{users.length}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Existing reactions */}
+            {Object.keys(emojis).length > 0 && (
+              <div className="flex flex-wrap gap-1 ml-2">
+                {Object.entries(emojis).map(([emoji, users]) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleReactionClick(emoji)}
+                    title={users.join(', ')}
+                    className={`
+                      px-1.5 py-0.5 rounded-md text-sm flex items-center gap-1
+                      ${users.includes(user?.username || '')
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-gray-100 text-gray-800 border border-gray-200'
+                      }
+                      hover:scale-105 transform transition-all duration-150
+                      hover:shadow-sm
+                      active:scale-95
+                    `}
+                  >
+                    <span className="select-none">{emoji}</span>
+                    {users.length > 1 && (
+                      <span className="text-xs font-medium">{users.length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {/* Add reaction button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmojiPicker(!showEmojiPicker);
-            }}
-            className={`
-              ml-2 px-2 py-0.5 rounded-md text-sm
-              ${showEmojiPicker ? 'bg-gray-200' : 'bg-transparent'}
-              hover:bg-gray-100 transition-colors
-              opacity-0 group-hover:opacity-100
-            `}
-          >
-            <span className="text-gray-500">+ Add reaction</span>
-          </button>
+            {/* Message actions */}
+            <div className="flex items-center gap-2 ml-2 opacity-0 group-hover:opacity-100">
+              {/* Add reaction button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEmojiPicker(!showEmojiPicker);
+                }}
+                className={`
+                  px-2 py-0.5 rounded-md text-sm
+                  ${showEmojiPicker ? 'bg-gray-200' : 'bg-transparent'}
+                  hover:bg-gray-100 transition-colors
+                `}
+              >
+                <span className="text-gray-500">+ Add reaction</span>
+              </button>
+
+              {/* Reply button */}
+              {onReply && (
+                <button
+                  onClick={() => onReply(id)}
+                  className="px-2 py-0.5 rounded-md text-sm bg-transparent hover:bg-gray-100 transition-colors flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                  <span className="text-gray-500">
+                    {repliesCount ? `${repliesCount} ${repliesCount === 1 ? 'reply' : 'replies'}` : 'Reply'}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Emoji picker */}
