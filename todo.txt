@@ -21,15 +21,21 @@
      - [x] Add thread navigation
      - [x] Style thread interface
 
-2. Scrollbars (Current Branch: scrollbars)
-   - [ ] Add scroll container to ChannelList
-   - [ ] Add scroll container to MessageList
-   - [ ] Add scroll container to ThreadView
-   - [ ] Add scroll container to UserList
-   - [ ] Implement infinite scroll loading where needed
-   - [ ] Style scrollbars consistently
+2. Scrollbars ✓
+   - [x] Add scroll container to ChannelList
+   - [x] Add scroll container to MessageList
+   - [x] Add scroll container to ThreadView
+   - [x] Add scroll container to UserList
+   - [x] Implement infinite scroll loading where needed
+   - [x] Style scrollbars consistently
 
-3. User Display
+3. Channel Management
+   - [ ] Fix channel creation redirect issue
+   - [ ] Improve channel creation form UX
+   - [ ] Add error handling for failed channel creation
+   - [ ] Add loading state during channel creation
+
+4. User Display
    - [ ] Create UserList component under channels
    - [ ] Add online/offline status indicators
    - [ ] Implement user search/filter
@@ -37,8 +43,7 @@
    - [ ] Style user list entries
    - [ ] Add user profile previews
 
-4. Direct Messages
-
+5. Direct Messages
    - API Changes
      - [ ] Add DM channel creation endpoint
      - [ ] Modify channel queries to handle DMs
@@ -51,7 +56,7 @@
      - [ ] Implement DM chat interface
      - [ ] Add DM-specific styling
 
-5. Deployment
+6. Deployment
    - [ ] Update Docker configurations
    - [ ] Set up production environment variables
    - [ ] Configure NGINX
