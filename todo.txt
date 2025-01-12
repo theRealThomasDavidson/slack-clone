@@ -33,10 +33,10 @@
    - [x] Style scrollbars consistently
 
 3. Channel Management
-   - [ ] Fix channel creation redirect issue
-   - [ ] Improve channel creation form UX
-   - [ ] Add error handling for failed channel creation
-   - [ ] Add loading state during channel creation
+   - [x] Fix channel creation redirect issue
+   - [x] Improve channel creation form UX
+   - [x] Add error handling for failed channel creation
+   - [x] Add loading state during channel creation
 
 4. User Display
    - [x] Create UserList component under channels
@@ -44,7 +44,6 @@
    - [x] Style user list entries
    - [ ] Implement user search/filter
    - [x] Add user presence system
-   - [ ] Add user profile previews
 
 5. Direct Messages
    - API Changes
@@ -54,10 +53,10 @@
      - [ ] Add DM list endpoint
 
    - Frontend Changes
-     - [x] Add DM initiation from user list
-     - [x] Create DM channel list component
-     - [x] Implement DM chat interface
-     - [x] Add DM-specific styling
+     - [ ] Add DM initiation from user list
+     - [ ] Create DM channel list component
+     - [ ] Implement DM chat interface
+     - [ ] Add DM-specific styling
 
 6. Deployment
    - [ ] Update Docker configurations

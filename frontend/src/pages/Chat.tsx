@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ChatWindow from '../components/chat/ChatWindow';
 import ChannelList from '../components/chat/ChannelList';
+import UserList from '../components/chat/UserList';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Channel {
@@ -24,10 +25,17 @@ const Chat: React.FC = () => {
     <div className="flex h-screen bg-gray-800">
       {/* Sidebar */}
       <div className="w-64 bg-gray-900 flex flex-col h-full">
-        <ChannelList 
-          onChannelSelect={handleChannelSelect}
-          selectedChannelId={currentChannelId}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <ChannelList 
+            onChannelSelect={handleChannelSelect}
+            selectedChannelId={currentChannelId}
+          />
+        </div>
+        <div className="border-t border-gray-700 h-48">
+          <div className="h-full overflow-y-auto">
+            <UserList />
+          </div>
+        </div>
       </div>
 
       {/* Main chat area */}
