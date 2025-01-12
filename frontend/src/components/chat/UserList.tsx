@@ -5,42 +5,49 @@ import { API_BASE_URL } from '../../contexts/BackendConfig';
 interface User {
   id: string;
   username: string;
-  is_online?: boolean;
+  online_status: boolean;
 }
 
-const UserList: React.FC = () => {
-  const { token } = useAuth();
+interface UserListProps {
+  onUserClick: (user: User) => void;
+}
+
+const UserList: React.FC<UserListProps> = ({ onUserClick }) => {
+  const { token, user: currentUser } = useAuth();
   const [users, setUsers] = React.useState<User[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    const fetchUsers = async () => {
-      if (!token) return;
-      
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/users`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch users');
+  const fetchUsers = async () => {
+    if (!token) return;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-        
-        const data = await response.json();
-        console.log('Fetched users:', data);
-        setUsers(data);
-      } catch (err) {
-        console.error('Error fetching users:', err);
-      } finally {
-        setIsLoading(false);
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
       }
-    };
+      
+      const data = await response.json();
+      // Filter out the current user
+      const otherUsers = data.filter((user: User) => user.username !== currentUser?.username);
+      setUsers(otherUsers);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  React.useEffect(() => {
     fetchUsers();
-  }, [token]);
+    // Poll for user presence every 5 seconds
+    const interval = setInterval(fetchUsers, 5000);
+    return () => clearInterval(interval);
+  }, [token, currentUser?.username]);
 
   if (isLoading) {
     return (
@@ -53,7 +60,7 @@ const UserList: React.FC = () => {
   if (users.length === 0) {
     return (
       <div className="text-center p-4 text-gray-400">
-        No users found
+        No other users found
       </div>
     );
   }
@@ -63,10 +70,31 @@ const UserList: React.FC = () => {
       {users.map((user) => (
         <div
           key={user.id}
-          className="p-4 flex items-center space-x-2 hover:bg-gray-700 transition-colors cursor-pointer"
+          onClick={() => onUserClick(user)}
+          className="p-4 flex items-center space-x-3 hover:bg-gray-700 transition-colors cursor-pointer"
         >
-          <div className={`w-2 h-2 rounded-full ${user.is_online ? 'bg-green-500' : 'bg-gray-500'}`} />
-          <span className="text-white">{user.username}</span>
+          <div className="relative">
+            <div 
+              className={`w-3 h-3 rounded-full ${
+                user.online_status 
+                  ? 'bg-green-500 animate-pulse' 
+                  : 'bg-red-500'
+              } transition-colors duration-300 shadow-lg`} 
+              title={user.online_status ? 'Online' : 'Offline'}
+            />
+            {user.online_status && (
+              <div 
+                className="absolute inset-0 w-3 h-3 rounded-full bg-green-500 animate-ping opacity-75"
+              />
+            )}
+          </div>
+          <span className={`${
+            user.online_status 
+              ? 'text-green-500' 
+              : 'text-red-500'
+          } transition-colors duration-300`}>
+            @{user.username}
+          </span>
         </div>
       ))}
     </div>

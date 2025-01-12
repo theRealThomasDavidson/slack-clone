@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict
+from jwt.exceptions import InvalidTokenError
 
 from ..database import get_db
 from ..models.user import User, UserCreate
@@ -63,20 +64,30 @@ async def login(
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
-):
+) -> User:
     """Get current user."""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    username = AuthService.verify_token(token)
-    if username is None:
-        raise credentials_exception
-    
-    user = await AuthService.get_user_by_username(db, username=username)
-    if user is None:
-        raise credentials_exception
-    
-    return user 
+    try:
+        username = AuthService.verify_token(token)
+        if username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user = await AuthService.get_user_by_username(db, username)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+            
+        AuthService.update_user_activity(user.username)
+        return user
+        
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) 

@@ -73,14 +73,25 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const handleSend = async () => {
+    console.log('handleSend called with:', {
+      messageLength: message.length,
+      messageTrimmed: message.trim().length,
+      selectedFiles: selectedFiles.length,
+      isSending,
+      channelId
+    });
+
     if ((message.trim() || selectedFiles.length > 0) && !isSending) {
+      console.log('Conditions met, proceeding with send');
       setIsSending(true);
       setError(null);
       try {
         // Handle both regular channels and DM channels
         if (channelId) {
+          console.log('ChannelId present:', channelId);
           const channelIdStr = String(channelId);
           if (channelIdStr.startsWith('dm-')) {
+            console.log('Handling DM channel');
             // For DM channels, get the target username from the channel name
             const targetUser = await fetch(`${API_BASE_URL}/users/${channelIdStr.replace('dm-', '')}`, {
               headers: {
@@ -113,6 +124,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             const formData = new FormData();
             formData.append('content', message.trim());
             formData.append('channel_id', channel.id.toString());
+            if (parentId) formData.append('parent_id', parentId);
             if (selectedFiles.length > 0) {
               formData.append('file', selectedFiles[0]);
             }

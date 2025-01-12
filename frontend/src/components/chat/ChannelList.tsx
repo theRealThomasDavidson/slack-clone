@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useApi } from '../../contexts/ApiContext';
 import { API_BASE_URL } from '../../contexts/BackendConfig';
+import UserList from './UserList';
 
 interface Channel {
   id: string;
@@ -248,44 +249,29 @@ export const ChannelList: React.FC<ChannelListProps> = ({
       <div className="flex-1 overflow-y-auto">
         {/* Channels Section */}
         <div className="p-4">
-          <h2 className="text-gray-400 text-sm font-semibold mb-2">Channels</h2>
-          {channels
-            .filter(channel => !channel.is_dm)
-            .map(channel => (
-              <button
-                key={channel.id}
-                onClick={() => onChannelSelect(channel.id)}
-                className={`w-full text-left p-2 rounded mb-1 ${
-                  selectedChannelId === channel.id
-                    ? 'bg-gray-700 text-white'
-                    : 'text-gray-400 hover:bg-gray-700 hover:text-white'
-                }`}
-              >
-                # {channel.name}
-              </button>
-            ))}
+          <h2 className="text-white text-lg font-semibold mb-2">Channels</h2>
+          {channels.map(channel => (
+            <div
+              key={channel.id}
+              onClick={() => onChannelSelect(channel.id)}
+              className={`
+                cursor-pointer p-2 rounded mb-1
+                ${selectedChannelId === channel.id ? 'bg-gray-600' : 'hover:bg-gray-700'}
+                ${channel.is_dm ? 'text-purple-300' : 'text-gray-300'}
+              `}
+            >
+              {channel.is_dm ? '@' : '#'} {channel.name}
+            </div>
+          ))}
+          <div ref={loader} className="h-4" />
         </div>
 
-        {/* Direct Messages Section */}
+        {/* Users Section */}
         <div className="p-4 border-t border-gray-700">
-          <h2 className="text-gray-400 text-sm font-semibold mb-2">Direct Messages</h2>
-          {users.map(user => (
-            <button
-              key={user.id}
-              onClick={() => handleUserClick(user)}
-              className={`w-full text-left p-2 rounded mb-1 ${
-                selectedChannelId === `dm-${user.username}` // Use username instead of ID
-                  ? 'bg-gray-700 text-white'
-                  : 'text-gray-400 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              @ {user.username}
-            </button>
-          ))}
+          <h2 className="text-white text-lg font-semibold mb-2">Direct Messages</h2>
+          <UserList onUserClick={handleUserClick} />
         </div>
       </div>
-
-      <div ref={loader} className="h-4" />
     </div>
   );
 };

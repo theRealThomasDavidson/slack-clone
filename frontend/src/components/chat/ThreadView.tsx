@@ -127,6 +127,7 @@ const ThreadView: React.FC<ThreadViewProps> = ({ parentMessage, onClose }) => {
 
       <div className="p-4 border-t border-gray-200">
         <MessageInput 
+          channelId={parentMessage.channel_id || ''}
           parentId={parentMessage.id}
           onMessageSent={fetchReplies}
           placeholder="Reply in thread..."

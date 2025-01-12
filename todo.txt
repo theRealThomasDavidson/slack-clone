@@ -32,53 +32,53 @@
    - [x] Implement infinite scroll loading where needed
    - [x] Style scrollbars consistently
 
-3. Channel Management
+3. Channel Management ✓
    - [x] Fix channel creation redirect issue
    - [x] Improve channel creation form UX
    - [x] Add error handling for failed channel creation
    - [x] Add loading state during channel creation
 
-4. User Display
+4. User Display ✓
    - [x] Create UserList component under channels
    - [x] Add online/offline status indicators
    - [x] Style user list entries
-   - [ ] Implement user search/filter
    - [x] Add user presence system
+   - [x] Implement user search/filter
 
-5. Direct Messages
-   - API Changes
+5. Direct Messages ✓
+   - API Changes ✓
      - [x] Add DM channel creation endpoint
      - [x] Modify channel queries to handle DMs
      - [x] Add participant management endpoints
      - [x] Add DM list endpoint
 
-   - Frontend Changes
+   - Frontend Changes ✓
      - [x] Add DM initiation from user list
      - [x] Create DM channel list component
      - [x] Implement DM chat interface
      - [x] Add DM-specific styling
 
-6. Deployment
+6. User Presence ✓
+   - API Changes ✓
+     - [x] Add in-memory user presence tracking in users service
+     - [x] Add last_active timestamp to user model
+     - [x] Add /users/active endpoint to get active users
+     - [x] Add middleware to update user's last_active timestamp
+
+   - Frontend Changes ✓
+     - [x] Add visual indicator for active users in UserList
+     - [x] Add polling to update active users every 5 seconds
+     - [x] Add presence indicator styling
+
+7. Deployment
    - [ ] Update Docker configurations
    - [ ] Set up production environment variables
    - [ ] Configure NGINX
    - [ ] Set up SSL certificates
    - [ ] Configure database backups
-   - [ ] Set up monitoring 
+   - [ ] Set up monitoring
 
 Current State (2024-03-19):
-- Completed Thread Support, Scrollbars, Channel Management, and Direct Messages
-- Added system user filtering
-- Improved error handling with retry delays
-
-Next Steps:
-1. User Display:
-   - Add user search/filter functionality
-   - Add user profile previews
-   - Improve user presence system
-
-2. Deployment:
-   - Set up production environment
-   - Configure deployment pipeline
-   - Set up monitoring
-   - Add error tracking 
+- Completed Thread Support, Scrollbars, Channel Management, Direct Messages, and User Presence
+- All core chat functionality is working including threads and DMs
+- Next: Move to deployment phase

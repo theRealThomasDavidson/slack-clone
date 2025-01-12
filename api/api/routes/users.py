@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..models.user import User as UserSchema, UserUpdate
@@ -12,6 +13,10 @@ from ..services.auth import AuthService
 from .auth import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+class UserWithPresence(UserSchema):
+    """User schema with presence information."""
+    online_status: bool
 
 @router.get("/me", response_model=UserSchema)
 async def get_current_user_profile(current_user: UserSchema = Depends(get_current_user)):
@@ -40,16 +45,29 @@ async def update_user_settings(
             detail=f"Failed to update user settings: {str(e)}"
         )
 
-@router.get("", response_model=List[UserSchema])
+@router.get("", response_model=List[UserWithPresence])
 async def get_users(
     current_user: UserSchema = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all users."""
+    """Get all users with their online status."""
     try:
         result = await db.execute(select(UserTable))
         users = result.scalars().all()
-        return users
+        
+        # Add presence information
+        return [
+            UserWithPresence(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                is_active=user.is_active,
+                created_at=user.created_at,
+                updated_at=user.updated_at,
+                online_status=AuthService.is_user_active(user.username)
+            )
+            for user in users
+        ]
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

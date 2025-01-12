@@ -1,7 +1,7 @@
 """Authentication service."""
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Dict, Optional
 import jwt
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
@@ -13,6 +13,9 @@ from ..models.tables.user import User as UserTable
 from ..core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# In-memory store for user activity
+user_last_seen: Dict[str, datetime] = {}
 
 class AuthService:
     @staticmethod
@@ -80,3 +83,15 @@ class AuthService:
         await db.commit()
         await db.refresh(db_user)
         return db_user 
+
+    @staticmethod
+    def update_user_activity(username: str) -> None:
+        """Update the last seen timestamp for a user."""
+        user_last_seen[username] = datetime.utcnow()
+    
+    @staticmethod
+    def is_user_active(username: str) -> bool:
+        """Check if a user has been active in the last 5 seconds."""
+        if username not in user_last_seen:
+            return False
+        return datetime.utcnow() - user_last_seen[username] <= timedelta(seconds=5) 
