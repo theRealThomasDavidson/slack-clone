@@ -1,0 +1,60 @@
+# Today's Implementation Checklist
+
+1. Thread Support ✓
+   - Database Changes ✓
+     - [x] Add UUID parent_id column to messages table
+     - [x] Update message model with parent relationship
+     - [x] Create migration for new column
+     - [x] Test parent-child relationship in database
+
+   - API Changes ✓
+     - [x] Update message schema to include parent_id field
+     - [x] Modify message creation endpoint to accept parent_id
+     - [x] Update message retrieval to include parent message data
+     - [x] Add endpoint for fetching thread messages
+     - [x] Add thread count to message response
+
+   - Frontend Changes ✓
+     - [x] Add reply button UI to messages
+     - [x] Create ThreadView component
+     - [x] Implement thread message display
+     - [x] Add thread navigation
+     - [x] Style thread interface
+
+2. Scrollbars (Current Branch: scrollbars)
+   - [ ] Add scroll container to ChannelList
+   - [ ] Add scroll container to MessageList
+   - [ ] Add scroll container to ThreadView
+   - [ ] Add scroll container to UserList
+   - [ ] Implement infinite scroll loading where needed
+   - [ ] Style scrollbars consistently
+
+3. User Display
+   - [ ] Create UserList component under channels
+   - [ ] Add online/offline status indicators
+   - [ ] Implement user search/filter
+   - [ ] Add user presence system
+   - [ ] Style user list entries
+   - [ ] Add user profile previews
+
+4. Direct Messages
+
+   - API Changes
+     - [ ] Add DM channel creation endpoint
+     - [ ] Modify channel queries to handle DMs
+     - [ ] Add participant management endpoints
+     - [ ] Add DM list endpoint
+
+   - Frontend Changes
+     - [ ] Add DM initiation from user list
+     - [ ] Create DM channel list component
+     - [ ] Implement DM chat interface
+     - [ ] Add DM-specific styling
+
+5. Deployment
+   - [ ] Update Docker configurations
+   - [ ] Set up production environment variables
+   - [ ] Configure NGINX
+   - [ ] Set up SSL certificates
+   - [ ] Configure database backups
+   - [ ] Set up monitoring 
