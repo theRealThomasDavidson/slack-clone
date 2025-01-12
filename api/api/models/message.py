@@ -21,6 +21,7 @@ class MessageBase(BaseModel):
     content: str
     channel_id: int
     user_id: Optional[int] = None
+    parent_id: Optional[int] = None  # For thread support
 
 class MessageCreate(MessageBase):
     """Message creation model."""
@@ -35,8 +36,15 @@ class Message(MessageBase):
     username: str
     emojis: Dict[str, List[str]] = {}  # {emoji: [usernames]}
     file: Optional[FileInfo] = None  # File information if this is a file message
+    
+    # Thread-related fields
+    parent_message: Optional["Message"] = None
+    replies: List["Message"] = []
+    replies_count: int = 0
 
     class Config:
         """Pydantic config."""
         from_attributes = True
         orm_mode = True  # Enable ORM mode 
+
+Message.model_rebuild()  # Update forward refs 

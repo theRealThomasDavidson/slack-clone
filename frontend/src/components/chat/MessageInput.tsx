@@ -4,8 +4,10 @@ import { API_BASE_URL } from '../../contexts/BackendConfig';
 import FileAttachmentButton from './FileAttachmentButton';
 
 interface MessageInputProps {
-  channelId: string;
+  channelId?: string;
+  parentId?: string;
   onMessageSent?: () => void;
+  placeholder?: string;
 }
 
 interface FileUploadProgress {
@@ -13,7 +15,12 @@ interface FileUploadProgress {
   progress: number;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ channelId, onMessageSent }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ 
+  channelId, 
+  parentId,
+  onMessageSent,
+  placeholder = "Type a message..."
+}) => {
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,12 +77,13 @@ const MessageInput: React.FC<MessageInputProps> = ({ channelId, onMessageSent })
       setIsSending(true);
       setError(null);
       try {
-        // Create FormData and append message content and channel_id
+        // Create FormData and append message content and IDs
         const formData = new FormData();
         formData.append('content', message.trim());
-        formData.append('channel_id', channelId);
+        if (channelId) formData.append('channel_id', channelId);
+        if (parentId) formData.append('parent_id', parentId);
 
-        // If there are files, append the first one (we'll handle multiple files later)
+        // If there are files, append the first one
         if (selectedFiles.length > 0) {
           formData.append('file', selectedFiles[0]);
         }
@@ -122,7 +130,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channelId, onMessageSent })
       <div className="flex items-end space-x-2">
         <div className="flex items-center space-x-2">
           <FileAttachmentButton
-            channelId={channelId}
+            channelId={channelId || 'thread'}
             onFileSelect={handleFileSelect}
             onError={setError}
           />
@@ -156,7 +164,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channelId, onMessageSent })
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Type a message..."
+          placeholder={placeholder}
           className="flex-1 resize-none rounded-lg border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           rows={1}
           disabled={isSending}

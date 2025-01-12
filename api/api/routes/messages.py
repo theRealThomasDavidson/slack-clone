@@ -37,15 +37,27 @@ def extract_file_id(content: str) -> Optional[str]:
 @router.post("/", response_model=Message)
 async def create_message(
     content: str = Form(...),
-    channel_id: str = Form(...),
+    channel_id: Optional[str] = Form(None),
+    parent_id: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new message with optional file attachment."""
+    """Create a new message with optional file attachment and thread support."""
     try:
-        # Convert channel_id to integer
-        channel_id_int = int(channel_id)
+        # Convert IDs to integers if provided
+        channel_id_int = int(channel_id) if channel_id else None
+        parent_id_int = int(parent_id) if parent_id else None
+        
+        # If it's a thread reply, get the parent message's channel
+        if parent_id_int and not channel_id_int:
+            parent_message = await db.get(MessageTable, parent_id_int)
+            if not parent_message:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Parent message not found"
+                )
+            channel_id_int = parent_message.channel_id
         
         # Handle file upload if present
         db_file = None
@@ -84,8 +96,9 @@ async def create_message(
         # Create message
         db_message = MessageTable(
             content=content,
-            channel_id=channel_id_int,  # Use the converted integer
-            user_id=current_user.id
+            channel_id=channel_id_int,
+            user_id=current_user.id,
+            parent_id=parent_id_int
         )
         db.add(db_message)
         await db.flush()  # Get message ID without committing
@@ -108,7 +121,8 @@ async def create_message(
             "updated_at": db_message.updated_at,
             "username": current_user.username,
             "emojis": {},
-            "file": None
+            "file": None,
+            "parent_id": db_message.parent_id
         }
         
         # Add file info if present
@@ -138,12 +152,16 @@ async def get_message(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get a specific message."""
-    # Query message with file relationship
+    """Get a specific message with its replies."""
+    # Query message with file and replies relationships
     result = await db.execute(
         select(MessageTable)
         .where(MessageTable.id == message_id)
-        .options(joinedload(MessageTable.file))
+        .options(
+            joinedload(MessageTable.file),
+            joinedload(MessageTable.replies).joinedload(MessageTable.file),
+            joinedload(MessageTable.replies).joinedload(MessageTable.reactions).joinedload(ReactionTable.user)
+        )
     )
     message = result.unique().scalar_one_or_none()
     
@@ -170,6 +188,48 @@ async def get_message(
     
     # Initialize empty emojis dict
     setattr(message, 'emojis', {})
+    
+    # Process replies
+    replies = []
+    for reply in message.replies:
+        reply_user = await db.get(User, reply.user_id)
+        reply_username = reply_user.username if reply_user else "System"
+        
+        # Format reactions for reply
+        emoji_data = {}
+        for reaction in reply.reactions:
+            if reaction.emoji not in emoji_data:
+                emoji_data[reaction.emoji] = []
+            if reaction.user:
+                emoji_data[reaction.emoji].append(reaction.user.username)
+        
+        reply_data = {
+            "id": reply.id,
+            "content": reply.content,
+            "channel_id": reply.channel_id,
+            "user_id": reply.user_id,
+            "created_at": reply.created_at,
+            "updated_at": reply.updated_at,
+            "username": reply_username,
+            "emojis": emoji_data,
+            "file": None,
+            "parent_id": reply.parent_id,
+            "parent_message": None
+        }
+        
+        # Add file info if present
+        if reply.file:
+            reply_data["file"] = {
+                "id": str(reply.file.id),
+                "filename": reply.file.filename,
+                "size": reply.file.size,
+                "content_type": reply.file.content_type
+            }
+        
+        replies.append(Message(**reply_data))
+    
+    setattr(message, 'replies', replies)
+    setattr(message, 'replies_count', len(replies))
     
     return message
 
@@ -208,7 +268,8 @@ async def get_channel_messages(
         .where(MessageTable.channel_id == channel_id)
         .options(
             joinedload(MessageTable.reactions).joinedload(ReactionTable.user),
-            joinedload(MessageTable.file)
+            joinedload(MessageTable.file),
+            joinedload(MessageTable.replies)
         )
         .order_by(MessageTable.created_at)
     )
@@ -239,7 +300,9 @@ async def get_channel_messages(
             "updated_at": message.updated_at,
             "username": username,
             "emojis": emoji_data,
-            "file": None
+            "file": None,
+            "parent_id": message.parent_id,
+            "replies_count": len(message.replies)
         }
         
         # Add file info if present
@@ -249,6 +312,86 @@ async def get_channel_messages(
                 "filename": message.file.filename,
                 "size": message.file.size,
                 "content_type": message.file.content_type
+            }
+        
+        response_messages.append(Message(**message_data))
+    
+    return response_messages 
+
+@router.get("/thread/{message_id}", response_model=List[Message])
+async def get_thread_messages(
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all messages in a thread."""
+    # Query messages with reactions, users, files, and parent messages
+    result = await db.execute(
+        select(MessageTable)
+        .where(MessageTable.parent_id == message_id)
+        .options(
+            joinedload(MessageTable.reactions).joinedload(ReactionTable.user),
+            joinedload(MessageTable.file),
+            joinedload(MessageTable.parent_message)
+        )
+        .order_by(MessageTable.created_at)
+    )
+    messages = result.unique().scalars().all()
+    
+    # Process each message
+    response_messages = []
+    for message in messages:
+        # Get message author's username
+        user = await db.get(User, message.user_id)
+        username = user.username if user else "System"
+        
+        # Format reactions as {emoji: [usernames]}
+        emoji_data = {}
+        for reaction in message.reactions:
+            if reaction.emoji not in emoji_data:
+                emoji_data[reaction.emoji] = []
+            if reaction.user:
+                emoji_data[reaction.emoji].append(reaction.user.username)
+        
+        # Prepare message data
+        message_data = {
+            "id": message.id,
+            "content": message.content,
+            "channel_id": message.channel_id,
+            "user_id": message.user_id,
+            "created_at": message.created_at,
+            "updated_at": message.updated_at,
+            "username": username,
+            "emojis": emoji_data,
+            "file": None,
+            "parent_id": message.parent_id,
+            "parent_message": None
+        }
+        
+        # Add file info if present
+        if message.file:
+            message_data["file"] = {
+                "id": str(message.file.id),
+                "filename": message.file.filename,
+                "size": message.file.size,
+                "content_type": message.file.content_type
+            }
+        
+        # Add parent message info if present
+        if message.parent_message:
+            parent_user = await db.get(User, message.parent_message.user_id)
+            parent_username = parent_user.username if parent_user else "System"
+            message_data["parent_message"] = {
+                "id": message.parent_message.id,
+                "content": message.parent_message.content,
+                "channel_id": message.parent_message.channel_id,
+                "user_id": message.parent_message.user_id,
+                "username": parent_username,
+                "created_at": message.parent_message.created_at,
+                "updated_at": message.parent_message.updated_at,
+                "emojis": {},  # We don't need reactions for parent messages in threads
+                "file": None,  # We don't need file info for parent messages in threads
+                "parent_id": message.parent_message.parent_id
             }
         
         response_messages.append(Message(**message_data))

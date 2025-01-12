@@ -49,8 +49,10 @@ interface MessageProps {
   createdAt: string;
   emojis: { [key: string]: string[] };
   file?: FileInfo | null;
+  repliesCount?: number;
   onAddReaction: (channelId: string, messageId: string, emoji: string) => void;
   onRemoveReaction: (channelId: string, messageId: string, emoji: string) => void;
+  onReply: (messageId: string) => void;
 }
 
 const Message: React.FC<MessageProps> = ({
@@ -62,8 +64,10 @@ const Message: React.FC<MessageProps> = ({
   createdAt,
   emojis,
   file,
+  repliesCount = 0,
   onAddReaction,
-  onRemoveReaction
+  onRemoveReaction,
+  onReply
 }) => {
   const { user, token } = useAuth();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -142,7 +146,7 @@ const Message: React.FC<MessageProps> = ({
           )}
         </div>
 
-        {/* Reactions container */}
+        {/* Reactions and Reply container */}
         <div className="mt-1 flex flex-col items-start gap-1">
           {/* Existing reactions */}
           {Object.keys(emojis).length > 0 && (
@@ -172,21 +176,54 @@ const Message: React.FC<MessageProps> = ({
             </div>
           )}
 
-          {/* Add reaction button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEmojiPicker(!showEmojiPicker);
-            }}
-            className={`
-              ml-2 px-2 py-0.5 rounded-md text-sm
-              ${showEmojiPicker ? 'bg-gray-200' : 'bg-transparent'}
-              hover:bg-gray-100 transition-colors
-              opacity-0 group-hover:opacity-100
-            `}
-          >
-            <span className="text-gray-500">+ Add reaction</span>
-          </button>
+          <div className="flex items-center gap-2 ml-2">
+            {/* Add reaction button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEmojiPicker(!showEmojiPicker);
+              }}
+              className={`
+                px-2 py-0.5 rounded-md text-sm
+                ${showEmojiPicker ? 'bg-gray-200' : 'bg-transparent'}
+                hover:bg-gray-100 transition-colors
+                opacity-0 group-hover:opacity-100
+              `}
+            >
+              <span className="text-gray-500">+ Add reaction</span>
+            </button>
+
+            {/* Reply button */}
+            <button
+              onClick={() => onReply(id)}
+              className={`
+                px-2 py-0.5 rounded-md text-sm
+                bg-transparent hover:bg-gray-100
+                transition-all duration-200
+                opacity-0 group-hover:opacity-100
+                flex items-center gap-1
+                hover:text-blue-600
+              `}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-4 w-4 text-gray-500 group-hover:text-blue-500" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" 
+                />
+              </svg>
+              <span className="text-gray-500 group-hover:text-blue-500">
+                {repliesCount > 0 ? `${repliesCount} ${repliesCount === 1 ? 'reply' : 'replies'}` : 'Reply'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Emoji picker */}

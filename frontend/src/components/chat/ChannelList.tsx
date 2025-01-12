@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL } from '../../contexts/BackendConfig';
 
@@ -21,11 +21,18 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
+  const loader = useRef(null);
 
-  // Fetch channels
-  const fetchChannels = async () => {
+  // Fetch channels with pagination
+  const fetchChannels = async (pageNum: number, append: boolean = false) => {
+    if (!token || isLoading) return;
+    
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/channels/`, {
+      const response = await fetch(`${API_BASE_URL}/channels/?page=${pageNum}&limit=20`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -36,25 +43,46 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
       }
       
       const data = await response.json();
-      setChannels(data);
+      setHasMore(data.length === 20);
+      setChannels(prev => append ? [...prev, ...data] : data);
+      setError(null);
     } catch (err) {
       console.error('Error fetching channels:', err);
       setError(err instanceof Error ? err.message : 'Failed to load channels');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Fetch channels on mount and when token changes
+  // Intersection observer for infinite scroll
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const target = entries[0];
+    if (target.isIntersecting && hasMore && !isLoading) {
+      setPage(prev => prev + 1);
+    }
+  }, [hasMore, isLoading]);
+
+  useEffect(() => {
+    const option = {
+      root: null,
+      rootMargin: "20px",
+      threshold: 1.0
+    };
+    const observer = new IntersectionObserver(handleObserver, option);
+    if (loader.current) observer.observe(loader.current);
+    return () => observer.disconnect();
+  }, [handleObserver]);
+
+  // Fetch initial channels and when page changes
   useEffect(() => {
     if (token) {
-      fetchChannels();
+      fetchChannels(page, page > 1);
     }
-  }, [token]);
+  }, [token, page]);
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    console.log('Attempting to create channel:', newChannelName);
-    console.log('Using token:', token);
 
     try {
       const response = await fetch(`${API_BASE_URL}/channels/`, {
@@ -69,16 +97,13 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
         })
       });
 
-      console.log('Response status:', response.status);
-      const responseData = await response.json();
-      console.log('Response data:', responseData);
-
       if (!response.ok) {
-        throw new Error(responseData.detail || 'Failed to create channel');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to create channel');
       }
 
       // Refresh the channels list
-      await fetchChannels();
+      await fetchChannels(1, false);
       
       // Reset form
       setShowCreateChannel(false);
@@ -94,12 +119,7 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
       <div className="p-4 border-b border-gray-700">
         <h2 className="text-lg font-semibold text-white mb-4">Channels</h2>
         <button
-          onClick={() => {
-            console.log('Create Channel button clicked');
-            console.log('Current showCreateChannel:', showCreateChannel);
-            setShowCreateChannel(true);
-            console.log('New showCreateChannel value should be true');
-          }}
+          onClick={() => setShowCreateChannel(true)}
           className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           Create Channel
@@ -118,10 +138,7 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
             <input
               type="text"
               value={newChannelName}
-              onChange={(e) => {
-                console.log('Channel name changed:', e.target.value);
-                setNewChannelName(e.target.value);
-              }}
+              onChange={(e) => setNewChannelName(e.target.value)}
               placeholder="Channel name"
               className="w-full p-2 mb-2 bg-gray-700 text-white rounded"
             />
@@ -144,19 +161,27 @@ const ChannelList: React.FC<ChannelListProps> = ({ onChannelSelect, selectedChan
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
-        {channels.map((channel) => (
-          <button
-            key={channel.id}
-            onClick={() => onChannelSelect(channel.id)}
-            className={`w-full p-4 text-left hover:bg-gray-700 transition-colors ${
-              selectedChannelId === channel.id ? 'bg-gray-700' : ''
-            }`}
-          >
-            <div className="text-white font-medium">#{channel.name}</div>
-            <div className="text-gray-400 text-sm">{channel.description}</div>
-          </button>
-        ))}
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+        <div className="space-y-1">
+          {channels.map((channel) => (
+            <button
+              key={channel.id}
+              onClick={() => onChannelSelect(channel.id)}
+              className={`w-full p-4 text-left hover:bg-gray-700 transition-colors ${
+                selectedChannelId === channel.id ? 'bg-gray-700' : ''
+              }`}
+            >
+              <div className="text-white font-medium">#{channel.name}</div>
+              <div className="text-gray-400 text-sm">{channel.description}</div>
+            </button>
+          ))}
+          {isLoading && (
+            <div className="text-center p-4 text-gray-400">
+              Loading more channels...
+            </div>
+          )}
+          <div ref={loader} />
+        </div>
       </div>
     </div>
   );
