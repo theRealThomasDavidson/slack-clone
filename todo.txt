@@ -1,25 +1,28 @@
 # Today's Implementation Checklist
 
 1. Thread Support ✓
-   - Database Changes ✓
-     - [x] Add UUID parent_id column to messages table
-     - [x] Update message model with parent relationship
-     - [x] Create migration for new column
-     - [x] Test parent-child relationship in database
+   - [x] Add reply button to messages
+   - [x] Create ThreadView component
+   - [x] Update MessageProps interface
+   - [x] Add parent_id to messages
+   - [x] Display thread messages
+   - [x] Handle reply functionality
+   - [x] Show reply counts
 
    - API Changes ✓
-     - [x] Update message schema to include parent_id field
-     - [x] Modify message creation endpoint to accept parent_id
-     - [x] Update message retrieval to include parent message data
-     - [x] Add endpoint for fetching thread messages
-     - [x] Add thread count to message response
+     - [x] Add thread endpoints
+     - [x] Update message schemas
+     - [x] Add reply routes
+     - [x] Fix API versioning and paths
+     - [x] Handle trailing slashes properly
 
    - Frontend Changes ✓
-     - [x] Add reply button UI to messages
-     - [x] Create ThreadView component
-     - [x] Implement thread message display
-     - [x] Add thread navigation
-     - [x] Style thread interface
+     - [x] Implement thread UI
+     - [x] Add reply functionality
+     - [x] Update message display
+     - [x] Filter thread messages
+     - [x] Fix channel creation
+     - [x] Handle API paths correctly
 
 2. Scrollbars ✓
    - [x] Add scroll container to ChannelList
