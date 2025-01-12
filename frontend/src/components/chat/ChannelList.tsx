@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useApi } from '../../contexts/ApiContext';
 import { API_BASE_URL } from '../../contexts/BackendConfig';
 
 interface Channel {
@@ -8,6 +9,7 @@ interface Channel {
   description: string;
   owner_id: string;
   members: string[];
+  is_dm?: boolean;
 }
 
 interface ChannelListProps {
@@ -22,7 +24,9 @@ const ChannelList: React.FC<ChannelListProps> = ({
   children 
 }) => {
   const { token } = useAuth();
+  const api = useApi();
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +34,31 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const loader = useRef(null);
+  const [lastUserFetchError, setLastUserFetchError] = useState<number>(0);
+  const RETRY_DELAY = 30000; // 30 seconds
+
+  const fetchUsers = async () => {
+    // If there was an error in the last 30 seconds, skip this fetch
+    if (Date.now() - lastUserFetchError < RETRY_DELAY) {
+      return;
+    }
+
+    try {
+      const usersData = await api.getUsers();
+      // Filter out system user and any users with invalid data
+      const validUsers = usersData.filter(user => 
+        user && 
+        user.id && 
+        user.username && 
+        !user.email?.includes('@chat.local')
+      );
+      setUsers(validUsers);
+      setLastUserFetchError(0); // Reset error state on success
+    } catch (err) {
+      setLastUserFetchError(Date.now()); // Record time of error
+      // Keep existing users list
+    }
+  };
 
   // Fetch channels with pagination
   const fetchChannels = async (pageNum: number, append: boolean = false) => {
@@ -42,22 +71,63 @@ const ChannelList: React.FC<ChannelListProps> = ({
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch channels');
       }
       
-      const data = await response.json();
-      setHasMore(data.length === 20);
-      setChannels(prev => append ? [...prev, ...data] : data);
+      const channelsData = await response.json();
+
+      // Only try to fetch users if we haven't had a recent error
+      if (Date.now() - lastUserFetchError >= RETRY_DELAY) {
+        await fetchUsers();
+      }
+
+      // Convert users to channel-like objects
+      const userChannels = users.map(user => ({
+        id: `dm-${user.id}`,
+        name: user.username,
+        description: `Direct message with ${user.username}`,
+        owner_id: user.id,
+        members: [user.id],
+        is_dm: true
+      }));
+
+      // Combine regular channels with user DM channels
+      const allChannels = [...channelsData, ...userChannels];
+      
+      setHasMore(channelsData.length === 20);
+      setChannels(prev => append ? [...prev, ...allChannels] : allChannels);
       setError(null);
     } catch (err) {
-      console.error('Error fetching channels:', err);
       setError(err instanceof Error ? err.message : 'Failed to load channels');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Set up polling interval
+  useEffect(() => {
+    if (token) {
+      // Initial fetch
+      fetchChannels(1, false);
+
+      // Set up polling every 10 seconds
+      const interval = setInterval(() => {
+        fetchChannels(1, false);
+      }, 10000);
+
+      // Cleanup interval on unmount
+      return () => clearInterval(interval);
+    }
+  }, [token]);
+
+  // Handle pagination
+  useEffect(() => {
+    if (token && page > 1) {
+      fetchChannels(page, true);
+    }
+  }, [token, page]);
 
   // Intersection observer for infinite scroll
   const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
@@ -77,13 +147,6 @@ const ChannelList: React.FC<ChannelListProps> = ({
     if (loader.current) observer.observe(loader.current);
     return () => observer.disconnect();
   }, [handleObserver]);
-
-  // Fetch initial channels and when page changes
-  useEffect(() => {
-    if (token) {
-      fetchChannels(page, page > 1);
-    }
-  }, [token, page]);
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,25 +178,23 @@ const ChannelList: React.FC<ChannelListProps> = ({
       setShowCreateChannel(false);
       setNewChannelName('');
     } catch (err) {
-      console.error('Error creating channel:', err);
       setError(err instanceof Error ? err.message : 'Failed to create channel');
     }
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Channels</h2>
+    <div className="h-full flex flex-col bg-gray-800">
+      <div className="sticky top-0 z-10 bg-gray-900 p-4">
         <button
           onClick={() => setShowCreateChannel(true)}
-          className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          className="w-full py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
         >
-          Create Channel
+          + Create Channel
         </button>
       </div>
 
       {error && (
-        <div className="p-4 text-red-500 bg-red-100 border-b border-red-200">
+        <div className="p-4 text-red-500 bg-red-100">
           {error}
         </div>
       )}
@@ -177,7 +238,19 @@ const ChannelList: React.FC<ChannelListProps> = ({
                 selectedChannelId === channel.id ? 'bg-gray-700' : ''
               }`}
             >
-              <div className="text-white font-medium">#{channel.name}</div>
+              <div className="text-white font-medium">
+                {channel.is_dm ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-400">👤</span>
+                    {channel.name}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-400">#</span>
+                    {channel.name}
+                  </span>
+                )}
+              </div>
               <div className="text-gray-400 text-sm">{channel.description}</div>
             </button>
           ))}
@@ -187,10 +260,6 @@ const ChannelList: React.FC<ChannelListProps> = ({
             </div>
           )}
           <div ref={loader} />
-        </div>
-
-        <div className="border-t border-gray-700 mt-4">
-          {children}
         </div>
       </div>
     </div>
