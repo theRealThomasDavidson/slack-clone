@@ -1,10 +1,12 @@
 #!/bin/bash
 
+
 # Change to project directory
-cd /home/ubuntu/slack-clone/rag-project
+SCRIPT_DR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &&pwd )"
+cd "$SCRIPT_DIR"
 
 # Activate virtual environment
 source .venv/bin/activate
 
 # Run Jesse
-python -m src.processing.run_jesse >> jesse.log 2>&1 
+python3 -m src.processing.run_jesse >> jesse.log 2>&1 

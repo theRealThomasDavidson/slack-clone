@@ -3,7 +3,7 @@ Jesse-style AI assistant using RAG with Breaking Bad dialogue.
 Responds to messages in DMs and channels, focusing on continuing conversations.
 """
 from langchain_openai import OpenAIEmbeddings, OpenAI
-from langchain_pinecone import PineconeVectorStore
+from langchain_pinecone import Pinecone
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import os
@@ -22,7 +22,7 @@ class JesseAI:
         self.auth_token = None
         self.login()
         self.embeddings = OpenAIEmbeddings()
-        self.vector_store = PineconeVectorStore(
+        self.vector_store = Pinecone(
             index_name=os.getenv("PINECONE_INDEX_3"),
             embedding=self.embeddings
         )
