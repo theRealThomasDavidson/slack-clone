@@ -15,7 +15,8 @@ class MessageUploader:
         self.embeddings = OpenAIEmbeddings()
         self.vector_store = PineconeVectorStore(
             index_name=os.getenv("PINECONE_INDEX_3"),
-            embedding=self.embeddings
+            embedding=self.embeddings,
+            namespace="chat-history"
         )
         self.tracker = MessageTracker()
         
