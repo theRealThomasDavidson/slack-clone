@@ -42,4 +42,6 @@ yarn-error.log*
 Thumbs.db
 
 
-rag-project/.venv/*
+rag-project/.venv/*webapp/vite.config.ts
+*vite.config.ts
+
