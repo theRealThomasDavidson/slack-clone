@@ -133,6 +133,7 @@ const MessageList: React.FC<MessageListProps> = ({
               !message.parent_id && // Not a reply
               (!selectedMessage || message.id !== selectedMessage.id) // Not the currently selected thread message
             )
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by timestamp, newest first
             .map((message) => (
               <Message
                 key={message.id}
