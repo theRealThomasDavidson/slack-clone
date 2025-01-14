@@ -119,11 +119,15 @@ class JesseAI:
                 for msg in reversed(messages[-5:])  # Get last 5 messages
             ])
         
-        # Get relevant dialogue from vector store
-        relevant_docs = self.vector_store.similarity_search(user_input, k=3)
-        dialogue_context = "\n".join([f"- {doc.page_content}" for doc in relevant_docs])
+        # Get relevant dialogue from both namespaces
+        bb_docs = self.vector_store.similarity_search(user_input, k=2)  # Breaking Bad dialogue
+        chat_docs = self.vector_store.similarity_search(user_input, k=2, namespace="chat-history")  # Chat history
         
-        template = """You are Jesse Pinkman from Breaking Bad. Use the following examples of Jesse's dialogue and conversation context to respond in his authentic voice and style.
+        # Combine and format both sets of context
+        bb_context = "\n".join([f"- {doc.page_content}" for doc in bb_docs])
+        chat_context = "\n".join([f"- {doc.page_content}" for doc in chat_docs])
+        
+        template = """You are Jesse Pinkman from Breaking Bad. Use the following examples of Jesse's dialogue and conversation history to respond in his authentic voice and style.
 Remember his key traits:
 - Uses slang and informal language (yo, like, etc.)
 - Emotional and expressive
@@ -131,8 +135,11 @@ Remember his key traits:
 - Street-smart but sometimes naive
 - Often reacts based on emotions
 
-Breaking Bad dialogue examples for context:
-{dialogue_context}
+Breaking Bad dialogue examples:
+{bb_context}
+
+Previous chat conversations:
+{chat_context}
 
 Recent conversation:
 {conversation_context}
@@ -144,12 +151,13 @@ Jesse's response:"""
 
         prompt = PromptTemplate(
             template=template,
-            input_variables=["dialogue_context", "conversation_context", "user_input"]
+            input_variables=["bb_context", "chat_context", "conversation_context", "user_input"]
         )
         
         chain = LLMChain(llm=self.llm, prompt=prompt)
         response = chain.run(
-            dialogue_context=dialogue_context,
+            bb_context=bb_context,
+            chat_context=chat_context,
             conversation_context=conversation_context,
             user_input=user_input
         )
