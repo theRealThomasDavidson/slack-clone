@@ -1,6 +1,9 @@
 import requests
 from src.utils.env import load_env_vars
 from .auth import login_user
+import os
+import sys
+from datetime import datetime
 
 def get_all_channels(auth_token=None, chat_app_url=None):
     """
@@ -104,25 +107,158 @@ def print_message_tree(messages, auth_token, chat_app_url, indent=0):
             if replies:
                 print_message_tree(replies, auth_token, chat_app_url, indent + 1)
 
+def get_user_messages(username, auth_token=None, chat_app_url=None):
+    """Get all messages from a specific user."""
+    if not auth_token:
+        auth_token = os.getenv('CHAT_APP_AUTH_TOKEN')
+    if not chat_app_url:
+        chat_app_url = os.getenv('CHAT_APP_URL')
+    
+    # Fix: Add 'Bearer' prefix if it's not already there
+    if auth_token and not auth_token.startswith('Bearer '):
+        auth_token = f'Bearer {auth_token}'
+    
+    headers = {
+        'Authorization': auth_token
+    }
+    
+    # First get all channels
+    channels_url = f"{chat_app_url.rstrip('/')}/api/v1/channels"
+    print(f"Fetching channels to find messages from user {username}")
+    
+    try:
+        channels_response = requests.get(channels_url, headers=headers)
+        channels_response.raise_for_status()
+        channels = channels_response.json()
+        
+        all_messages = []
+        # Get messages from each channel
+        for channel in channels:
+            channel_url = f"{chat_app_url.rstrip('/')}/api/v1/messages/channel/{channel['id']}"
+            messages_response = requests.get(channel_url, headers=headers)
+            if messages_response.status_code == 200:
+                channel_messages = messages_response.json()
+                # Filter messages by username
+                user_messages = [msg for msg in channel_messages if msg.get('username') == username]
+                all_messages.extend(user_messages)
+        
+        return all_messages
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching messages: {str(e)}")
+        return None
+
+def print_user_messages(username, auth_token=None, chat_app_url=None):
+    """Print all messages from a specific user in a readable format."""
+    messages = get_user_messages(username, auth_token, chat_app_url)
+    if not messages:
+        print(f"No messages found for user {username}")
+        return
+    
+    print(f"\nMessages from {username}:")
+    print("-" * 50)
+    
+    for message in messages:
+        # Format timestamp
+        created_at = datetime.fromisoformat(message['created_at'].replace('Z', '+00:00'))
+        formatted_time = created_at.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Get channel info if available
+        channel_context = f"in channel {message['channel_id']}" if message['channel_id'] else "in DM"
+        
+        # Format message header
+        print(f"{formatted_time} {channel_context}:")
+        print(f"{message['content']}")
+        
+        # Show file attachment if present
+        if message['file']:
+            print(f"[Attached file: {message['file']['filename']}]")
+        
+        # Show reactions if present
+        if message['emojis']:
+            reactions = [f"{emoji}: {', '.join(users)}" for emoji, users in message['emojis'].items()]
+            print(f"Reactions: {' | '.join(reactions)}")
+        
+        # Show reply count if there are replies
+        if message.get('replies_count', 0) > 0:
+            print(f"Replies: {message['replies_count']}")
+        
+        print("-" * 50)
+
+def get_all_users(auth_token=None, chat_app_url=None):
+    """
+    Retrieve all users with their online status.
+    If auth_token is not provided, will attempt to login using env credentials.
+    """
+    config = load_env_vars()
+    if chat_app_url is None:
+        chat_app_url = config['chat_app_url']
+    
+    # Get auth token if not provided
+    if auth_token is None:
+        auth_token = login_user(chat_app_url=chat_app_url)
+        if auth_token is None:
+            print("Failed to get authentication token")
+            return None
+    
+    url = f"{chat_app_url.rstrip('/')}/api/v1/users"
+    
+    headers = {
+        "Authorization": auth_token
+    }
+    
+    print(f"Retrieving all users")
+    try:
+        response = requests.get(url, headers=headers)
+        print(f"Response status: {response.status_code}")
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to retrieve users: {e}")
+        return None
+
+def print_users(auth_token=None, chat_app_url=None):
+    """Print all users in a readable format with their online status."""
+    users = get_all_users(auth_token, chat_app_url)
+    if not users:
+        print("No users found")
+        return
+    
+    print("\nUsers:")
+    print("-" * 50)
+    
+    # Sort users by online status (online first) then by username
+    sorted_users = sorted(users, key=lambda x: (-x['online_status'], x['username'].lower()))
+    
+    for user in sorted_users:
+        status = "🟢 Online" if user['online_status'] else "⚫ Offline"
+        created_at = datetime.fromisoformat(user['created_at'].replace('Z', '+00:00'))
+        formatted_time = created_at.strftime('%Y-%m-%d %H:%M:%S')
+        
+        print(f"{user['username']} - {status}")
+        print(f"Joined: {formatted_time}")
+        print(f"Email: {user['email']}")
+        print("-" * 50)
+
 if __name__ == "__main__":
     # Example usage
     auth_token = login_user()
     if auth_token:
-        # First get all channels
+        print("\nGetting all users:")
+        print_users(auth_token)
+        
         print("\nGetting all channels:")
         channels = get_all_channels(auth_token)
         if channels:
             print("\nAvailable channels:")
             for channel in channels:
-                print(f"- {channel.get('name', 'Unnamed')} (ID: {channel.get('id', 'No ID')})")
-            
-            # Find Saul's office channel
-            sauls_office = next((channel for channel in channels if channel['name'] == 'sauls-office'), None)
-            if sauls_office:
-                print(f"\nGetting messages from Saul's office (ID: {sauls_office['id']}):")
-                channel_messages = get_channel_messages(sauls_office['id'], auth_token)
-                if channel_messages:
-                    print("\nMessages and Replies:")
-                    print_message_tree(channel_messages, auth_token, None)
-            else:
-                print("\nCouldn't find Saul's office channel") 
+                print(f"Channel: {channel.get('name', 'Unnamed')} (ID: {channel.get('id')})")
+                print("Getting messages from this channel:")
+                messages = get_channel_messages(channel['id'], auth_token)
+                if messages:
+                    print(f"Found {len(messages)} messages")
+                    for msg in messages:
+                        print(f"- {msg.get('username')}: {msg.get('content')}")
+                print("-" * 50)
+        
+        print("\nGetting messages from user 'hank':")
+        print_user_messages("hank", auth_token)
