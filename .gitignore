@@ -43,3 +43,5 @@ Thumbs.db
 
 
 rag-project/.venv/*
+rag-project/last_checked.json
+rag-project/run_jesse_loop.sh
