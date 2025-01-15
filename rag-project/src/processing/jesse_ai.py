@@ -120,7 +120,7 @@ class JesseAI:
             ])
         
         # Get relevant dialogue from both namespaces
-        bb_docs = self.vector_store.similarity_search(user_input, k=2)  # Breaking Bad dialogue
+        bb_docs = self.vector_store.similarity_search(user_input, k=2, namespace="jesse-script")  # Breaking Bad dialogue
         chat_docs = self.vector_store.similarity_search(user_input, k=2, namespace="chat-history")  # Chat history
         
         # Combine and format both sets of context

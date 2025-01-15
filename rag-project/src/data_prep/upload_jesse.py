@@ -53,6 +53,7 @@ def upload_jesse_dialogue():
         documents=split_docs,
         embedding=embeddings,
         index_name=os.getenv('PINECONE_INDEX_3'),
+        namespace="jesse-script"
     )
     
     print("Upload complete!")

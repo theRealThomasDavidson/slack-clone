@@ -133,7 +133,7 @@ const MessageList: React.FC<MessageListProps> = ({
               !message.parent_id && // Not a reply
               (!selectedMessage || message.id !== selectedMessage.id) // Not the currently selected thread message
             )
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // Sort by timestamp, newest first
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // Sort ascending, oldest to newest
             .map((message) => (
               <Message
                 key={message.id}
@@ -142,7 +142,7 @@ const MessageList: React.FC<MessageListProps> = ({
                 username={message.username}
                 userId={message.user_id}
                 channelId={channelId}
-                createdAt={message.created_at}
+                createdAt={new Date(message.created_at).toLocaleString()}
                 emojis={message.emojis}
                 file={message.file}
                 repliesCount={message.replies_count}
