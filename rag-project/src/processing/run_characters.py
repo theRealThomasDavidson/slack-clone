@@ -97,7 +97,7 @@ def main():
     print("Starting Breaking Bad Character AI Scheduler")
     
     # Schedule the job to run every minute
-    schedule.every(1).minutes.do(run_all_characters)
+    schedule.every(15).seconds.do(run_all_characters)
     
     # Run once immediately
     run_all_characters()
