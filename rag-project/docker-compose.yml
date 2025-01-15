@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  character-ais:
+    build: .
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PINECONE_API_KEY=${PINECONE_API_KEY}
+      - PINECONE_INDEX_3=${PINECONE_INDEX_3}
+      - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
+      - chat_app_url=${chat_app_url}
+      # Character Credentials
+      - JESSE_USERNAME=${JESSE_USERNAME}
+      - JESSE_PASSWORD=${JESSE_PASSWORD}
+      - WALT_USERNAME=${WALT_USERNAME}
+      - WALT_PASSWORD=${WALT_PASSWORD}
+      - SAUL_USERNAME=${SAUL_USERNAME}
+      - SAUL_PASSWORD=${SAUL_PASSWORD}
+      - SKYLER_USERNAME=${SKYLER_USERNAME}
+      - SKYLER_PASSWORD=${SKYLER_PASSWORD}
+      - HANK_USERNAME=${HANK_USERNAME}
+      - HANK_PASSWORD=${HANK_PASSWORD}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

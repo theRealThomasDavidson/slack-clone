@@ -1,45 +1,54 @@
 """
-Jesse-style AI assistant using RAG with Breaking Bad dialogue.
-Responds to messages in DMs and channels, focusing on continuing conversations.
+Base class for Breaking Bad character AI assistants.
+Each character will inherit from this and customize their personality.
 """
 from langchain_openai import OpenAIEmbeddings, OpenAI
 from langchain_pinecone import Pinecone
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import os
-import json
+from pathlib import Path
 import requests
-from datetime import datetime, timedelta
-from ..utils.env import load_env_vars
-from ..client.auth import login_user
 from dotenv import load_dotenv
+from ..client.auth import login_user
 
-class JesseAI:
-    def __init__(self):
-        load_dotenv()
-        self.config = load_env_vars()
-        self.base_url = self.config["chat_app_url"].rstrip('/')
+# Get the rag-project root directory and load .env
+RAG_PROJECT_ROOT = Path(__file__).parent.parent.parent
+load_dotenv(RAG_PROJECT_ROOT / '.env')
+
+class CharacterAI:
+    def __init__(self, username, password, character_name, personality_traits):
+        self.character_name = character_name
+        self.personality_traits = personality_traits
+        self.username = username
+        self.password = password
         self.auth_token = None
+        self.base_url = os.getenv("chat_app_url").rstrip('/')
+        
+        # Initialize auth token
         self.login()
+        
+        # Initialize AI components
         self.embeddings = OpenAIEmbeddings()
         self.vector_store = Pinecone(
             index_name=os.getenv("PINECONE_INDEX_3"),
-            embedding=self.embeddings
+            embedding=self.embeddings,
+            namespace=f"{username}-dialogue"  # Each character gets their own namespace
         )
         self.llm = OpenAI(temperature=0.7)
         
     def login(self):
         """Login to the chat app."""
         response = login_user(
-            chat_app_url=os.getenv("chat_app_url"),
-            chat_app_username="pinkman",
-            chat_app_password="sciencebitch"
+            chat_app_url=self.base_url,
+            chat_app_username=self.username,
+            chat_app_password=self.password
         )
         if response:
             self.auth_token = response
-            print("Yo, logged in successfully!")
+            print(f"{self.character_name} logged in successfully!")
             return True
-        print("Login failed, yo!")
+        print(f"{self.character_name} login failed!")
         return False
 
     def should_check_channel(self, channel):
@@ -58,9 +67,9 @@ class JesseAI:
         return False
         
     def should_respond(self, message_data):
-        """Determine if Jesse should respond to this message."""
+        """Determine if character should respond to this message."""
         # Don't respond to our own messages
-        if message_data.get("username") == "pinkman":
+        if message_data.get("username") == self.username:
             print("  ✗ Won't respond to own message")
             return False
             
@@ -85,14 +94,13 @@ class JesseAI:
             print("  ✓ Will respond to private channel message")
             return True
             
-        # Respond to replies to Jesse's messages
+        # Respond to replies to character's messages
         if message_data.get("reply_to"):
-            # Get the original message to check if it was Jesse's
             reply_url = f"{self.base_url}/api/v1/messages/{message_data['reply_to']}"
             response = requests.get(reply_url, headers=headers)
             if response.status_code == 200:
                 original_msg = response.json()
-                if original_msg.get("username") == "pinkman":
+                if original_msg.get("username") == self.username:
                     print("  ✓ Will respond to reply to my message")
                     return True
                     
@@ -100,7 +108,7 @@ class JesseAI:
         return False
         
     def get_response(self, message_data: dict) -> str:
-        """Generate Jesse's response using RAG."""
+        """Generate character's response using RAG."""
         user_input = message_data["content"]
         
         # Get conversation context
@@ -119,45 +127,34 @@ class JesseAI:
                 for msg in reversed(messages[-5:])  # Get last 5 messages
             ])
         
-        # Get relevant dialogue from both namespaces
-        bb_docs = self.vector_store.similarity_search(user_input, k=2, namespace="jesse-script")  # Breaking Bad dialogue
-        chat_docs = self.vector_store.similarity_search(user_input, k=2, namespace="chat-history")  # Chat history
+        # Get relevant dialogue
+        relevant_docs = self.vector_store.similarity_search(user_input, k=3)
+        dialogue_context = "\n".join([f"- {doc.page_content}" for doc in relevant_docs])
         
-        # Combine and format both sets of context
-        bb_context = "\n".join([f"- {doc.page_content}" for doc in bb_docs])
-        chat_context = "\n".join([f"- {doc.page_content}" for doc in chat_docs])
-        
-        template = """You are Jesse Pinkman from Breaking Bad. Use the following examples of Jesse's dialogue and conversation history to respond in his authentic voice and style.
-Remember his key traits:
-- Uses slang and informal language (yo, like, etc.)
-- Emotional and expressive
-- Loyal but sometimes conflicted
-- Street-smart but sometimes naive
-- Often reacts based on emotions
+        template = f"""You are {self.character_name} from Breaking Bad. Use the following examples of your dialogue and conversation history to respond in your authentic voice and style.
 
-Breaking Bad dialogue examples:
-{bb_context}
+Key character traits:
+{self.personality_traits}
 
-Previous chat conversations:
-{chat_context}
+Previous dialogue examples:
+{{dialogue_context}}
 
 Recent conversation:
-{conversation_context}
+{{conversation_context}}
 
 Current message to respond to:
-{user_input}
+{{user_input}}
 
-Jesse's response:"""
+{self.character_name}'s response:"""
 
         prompt = PromptTemplate(
             template=template,
-            input_variables=["bb_context", "chat_context", "conversation_context", "user_input"]
+            input_variables=["dialogue_context", "conversation_context", "user_input"]
         )
         
         chain = LLMChain(llm=self.llm, prompt=prompt)
         response = chain.run(
-            bb_context=bb_context,
-            chat_context=chat_context,
+            dialogue_context=dialogue_context,
             conversation_context=conversation_context,
             user_input=user_input
         )
@@ -170,7 +167,6 @@ Jesse's response:"""
             "Authorization": self.auth_token
         }
         
-        # Build form data
         form_data = {
             "content": content,
             "channel_id": str(channel_id)
@@ -204,11 +200,9 @@ Jesse's response:"""
         for channel in channels:
             print(f"\nChecking channel: {channel['name']}")
             
-            # First check if we should even look at this channel
             if not self.should_check_channel(channel):
                 continue
                 
-            # Get recent messages
             messages_url = f"{self.base_url}/api/v1/messages/channel/{channel['id']}"
             response = requests.get(messages_url, headers=headers)
             
@@ -221,7 +215,6 @@ Jesse's response:"""
                 print("  No messages found")
                 continue
                 
-            # Get the last message
             last_message = messages[-1]
             print(f"  Last message from {last_message['username']}: {last_message['content'][:50]}...")
             
@@ -232,14 +225,4 @@ Jesse's response:"""
                 self.send_message(
                     channel_id=last_message['channel_id'],
                     content=response
-                )
-            else:
-                print("  No response needed")
-
-def main():
-    """Run the Jesse AI bot for one pass."""
-    jesse = JesseAI()
-    jesse.check_and_respond()
-
-if __name__ == "__main__":
-    main() 
+                ) 
