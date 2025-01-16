@@ -52,3 +52,5 @@ webapp/vite.config.ts
 *vite.config.ts
 rag-project/.venv/*webapp/vite.config.ts
 *.log
+youtube-search/data/
+*.json

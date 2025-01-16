@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  youtube-search:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "0.0.0.0:8001:8001"
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=development
+    volumes:
+      - ./src:/app/src
+      - ./data/transcripts:/app/data/transcripts
+      - ./data/processed:/app/data/processed
+      - ./.env:/app/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - youtube-search-net
+
+networks:
+  youtube-search-net:
+    driver: bridge
