@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Chat from './pages/Chat';
+import YouTubeSearch from './pages/YouTubeSearch';
 import PrivateRoute from './components/auth/PrivateRoute';
 
 const AppRoutes: React.FC = () => {
@@ -15,6 +16,14 @@ const AppRoutes: React.FC = () => {
         element={
           <PrivateRoute>
             <Chat />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/youtube-search"
+        element={
+          <PrivateRoute>
+            <YouTubeSearch />
           </PrivateRoute>
         }
       />
