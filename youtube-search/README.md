@@ -1,41 +1,97 @@
-# YouTube Transcript Search Service
+# YouTube Transcript Search
 
-A microservice that enables semantic search over YouTube video transcripts. Built with FastAPI, OpenAI embeddings, and Pinecone vector database.
+A semantic search engine for YouTube video transcripts. This service allows users to search through video content using natural language queries and get relevant video segments as responses.
 
 ## Features
 
 - 🔍 Semantic search through video transcripts
 - 💡 Question answering based on transcript content
 - 🎯 Filter results by channel or video
+- 🎥 Direct video playback at relevant timestamps
+- 🌙 Dark mode UI with responsive design
 - 🚀 Fast vector search using Pinecone
 - 🤖 OpenAI embeddings for semantic understanding
 - 🔄 Real-time transcript processing and chunking
 
-## Setup
+## How It Works
 
-1. Clone the repository
-2. Create a `.env` file with required credentials:
-```env
-OPENAI_API_KEY=your_openai_key
-PINECONE_API_KEY=your_pinecone_key
-PINECONE_ENVIRONMENT=gcp-starter
-PINECONE_INDEX=your_index_name
-PINECONE_NAMESPACE=youtube_transcripts
+1. **Data Collection**:
+   - Using the YouTube Data API, we fetch video information from specified channels
+   - We download video transcripts using `youtube_transcript_api`
+   - Transcripts are saved as JSON files in `data/transcripts/`
+
+2. **Data Processing**:
+   - Transcripts are split into overlapping chunks (850-1000 characters)
+   - Each chunk includes metadata: video title, URL, timestamps, and channel
+   - Chunks are processed to maintain context and readability
+
+3. **Vector Database**:
+   - We use Pinecone as our vector database
+   - Each chunk is converted to embeddings using OpenAI's text-embedding-ada-002 model
+   - Embeddings are stored in Pinecone for efficient semantic search
+
+4. **Search Implementation**:
+   - User queries are converted to embeddings using the same model
+   - Pinecone performs similarity search to find relevant transcript chunks
+   - Results include direct links to video timestamps
+
+## Project Structure
+
+```
+youtube-search/
+├── src/
+│   ├── api/          # FastAPI application and routes
+│   ├── core/         # Core types and interfaces
+│   ├── search/       # Search and QA functionality
+│   └── tests/        # Test scripts and examples
+├── data/
+│   ├── transcripts/  # Raw transcript data
+│   └── processed/    # Processed chunks
+├── Dockerfile        # Container definition
+└── docker-compose.yml
 ```
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+## Environment Setup
 
-4. Run with Docker:
-```bash
-docker-compose up --build
-```
+1. **Prerequisites**:
+   - Python 3.11+
+   - Node.js 18+
+   - Docker and Docker Compose
+   - Pinecone account
+   - OpenAI API key
 
-The service will be available at `http://localhost:8001`
+2. **Environment Variables**:
+   Create a `.env` file with:
+   ```env
+   OPENAI_API_KEY=your_openai_key
+   PINECONE_API_KEY=your_pinecone_key
+   PINECONE_ENVIRONMENT=gcp-starter
+   PINECONE_INDEX=your_index_name
+   PINECONE_NAMESPACE=youtube_transcripts
+   ```
 
-## API Endpoints
+3. **Running the Application**:
+   ```bash
+   # Build and start containers
+   docker-compose up --build
+
+   # The API will be available at http://localhost:8001
+   # Frontend will be available at http://localhost:5173
+   ```
+
+4. **Data Pipeline** (if you want to add more videos):
+   ```bash
+   # Fetch transcripts
+   python src/fetch.py
+
+   # Process and chunk transcripts
+   python src/process.py
+
+   # Upload to Pinecone
+   python src/data/upload.py
+   ```
+
+## API Documentation
 
 ### Search Transcripts
 ```http
@@ -66,22 +122,6 @@ Content-Type: application/json
 GET /api/channels
 ```
 
-## Project Structure
-
-```
-youtube-search/
-├── src/
-│   ├── api/          # FastAPI application and routes
-│   ├── core/         # Core types and interfaces
-│   ├── search/       # Search and QA functionality
-│   └── tests/        # Test scripts and examples
-├── data/
-│   ├── transcripts/  # Raw transcript data
-│   └── processed/    # Processed chunks
-├── Dockerfile        # Container definition
-└── docker-compose.yml
-```
-
 ## Development
 
 1. Run with hot reload:
@@ -99,15 +139,23 @@ http://localhost:8001/docs
 python -m pytest src/tests
 ```
 
-## Environment Variables
+## Tech Stack
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| OPENAI_API_KEY | OpenAI API key for embeddings | Yes |
-| PINECONE_API_KEY | Pinecone API key | Yes |
-| PINECONE_ENVIRONMENT | Pinecone environment (e.g. gcp-starter) | Yes |
-| PINECONE_INDEX | Pinecone index name | Yes |
-| PINECONE_NAMESPACE | Namespace for vectors (default: youtube_transcripts) | Yes |
+- **Backend**: 
+  - FastAPI for API development
+  - OpenAI for embeddings and question answering
+  - Pinecone for vector search
+  - Python 3.11+ for processing
+
+- **Frontend**:
+  - React with TypeScript
+  - Tailwind CSS for styling
+  - Video embedding and playback
+
+- **Infrastructure**:
+  - Docker and Docker Compose
+  - Environment-based configuration
+  - Hot reload for development
 
 ## Contributing
 
