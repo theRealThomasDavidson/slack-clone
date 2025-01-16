@@ -8,7 +8,7 @@
 
 ## 2. Data Processing
 - [x] Create chunking logic in `src/process.py` - ✓ Built and tested in `src/process.py:split_segments()`
-- [x] Implement overlap between chunks (850-1000 chars) - ✓ Tested with real transcripts
+- [x] Implement overlap between chunks (900-1000 chars) - ✓ Tested with real transcripts
 - [x] Add metadata handling (title, video_id, timestamps) - ✓ Implemented and tested with real data
 - [x] Test Pinecone connection and upload - ✓ Verified with test data
 
@@ -42,4 +42,20 @@
 - [ ] Add example requests/responses - ⚠️ Initial examples added
 - [ ] Create usage guide - ⚠️ Getting started guide planned
 - [ ] Add error handling documentation - ⚠️ Common errors documented
-- [ ] Document environment setup - ⚠️ Basic setup instructions added 
+- [ ] Document environment setup - ⚠️ Basic setup instructions added
+
+## Today's Tasks
+
+- [x] Create chunking logic in `src/process.py` - ✓ Built and tested in `src/process.py:split_segments()`
+- [x] Implement overlap between chunks (900-1000 chars) - ✓ Tested with real transcripts
+- [x] Add metadata handling (title, video_id, timestamps) - ✓ Implemented and tested with real data
+- [x] Add YouTube transcript search UI component
+- [x] Implement dark mode styling
+- [x] Add navigation between chat and search
+- [ ] Add descriptive error messages to registration page:
+  - [ ] Show specific validation errors for each field
+  - [ ] Display clear messages for duplicate usernames
+  - [ ] Handle network/server errors gracefully
+  - [ ] display clear errors for username too short, too long, or invalid characters
+  - [ ] display clear errors for email having an @ bot not looking like a url is behind it
+
