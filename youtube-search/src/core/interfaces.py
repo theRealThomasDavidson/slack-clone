@@ -203,3 +203,58 @@ class QuestionResponse(BaseModel):
             }]
         }
     }
+
+# Message Types
+class MessageSimilarityRequest(BaseModel):
+    """Request for finding similar messages."""
+    message: str = Field(..., description="The message to find similar messages for")
+    max_results: int = Field(10, gt=0, description="Maximum number of results to return")
+    min_score: float = Field(0.7, ge=0, le=1, description="Minimum similarity score threshold")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "message": "I am the one who knocks",
+                "max_results": 5,
+                "min_score": 0.7
+            }
+        }
+    }
+
+class MessageSearchResult(BaseModel):
+    """Single message search result with metadata."""
+    text: str = Field(..., description="The message content")
+    score: float = Field(..., ge=0, le=1, description="Similarity score")
+    channel_id: str = Field(..., description="Channel ID")
+    username: str = Field(..., description="Username who sent the message")
+    timestamp: str = Field(..., description="Message timestamp")
+    url: str = Field(..., description="URL to the message in the channel")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "text": "hey guys this weekend i am going to rev up my bacon and go for a stroll are yall in?",
+                "score": 0.95,
+                "channel_id": "1",
+                "username": "alice",
+                "timestamp": "2025-01-17T18:01:34.190312",
+                "url": "/channels/1?t=2025-01-17T18:01:34.190312"
+            }
+        }
+    }
+
+class MessageSearchResponse(BaseModel):
+    """Search response containing message results."""
+    results: List[MessageSearchResult] = Field(default_factory=list, description="List of similar messages")
+    total: int = Field(..., description="Total number of results")
+    query: str = Field(..., description="Original message query")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "results": [],
+                "total": 0,
+                "query": "how do you stroll with bacon?"
+            }
+        }
+    }
