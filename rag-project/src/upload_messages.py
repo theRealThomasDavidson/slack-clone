@@ -1,6 +1,6 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_pinecone import PineconeVectorStore
+from langchain_pinecone import Pinecone
 from langchain.schema import Document
 import os
 from dotenv import load_dotenv
@@ -94,7 +94,7 @@ def main():
     # Upload to Pinecone
     try:
         embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-        vector_store = PineconeVectorStore.from_documents(
+        vector_store = Pinecone.from_documents(
             documents=split_docs,
             embedding=embeddings,
             index_name=PINECONE_INDEX

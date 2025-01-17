@@ -1,18 +1,21 @@
 import requests
-from src.utils.env import load_env_vars
-from .auth import login_user
-import os
-import sys
 from datetime import datetime
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+from .auth import login_user
+
+# Get the rag-project root directory and load .env
+RAG_PROJECT_ROOT = Path(__file__).parent.parent.parent
+load_dotenv(RAG_PROJECT_ROOT / '.env')
 
 def get_all_channels(auth_token=None, chat_app_url=None):
     """
     Retrieve all available channels.
     If auth_token is not provided, will attempt to login using env credentials.
     """
-    config = load_env_vars()
     if chat_app_url is None:
-        chat_app_url = config['chat_app_url']
+        chat_app_url = os.getenv('chat_app_url')
     
     # Get auth token if not provided
     if auth_token is None:
@@ -43,9 +46,8 @@ def get_channel_messages(channel_id, auth_token=None, chat_app_url=None):
     Retrieve all messages from a specific channel.
     If auth_token is not provided, will attempt to login using env credentials.
     """
-    config = load_env_vars()
     if chat_app_url is None:
-        chat_app_url = config['chat_app_url']
+        chat_app_url = os.getenv('chat_app_url')
     
     # Get auth token if not provided
     if auth_token is None:
@@ -75,9 +77,8 @@ def get_message_replies(message_id, auth_token=None, chat_app_url=None):
     """
     Retrieve all replies for a specific message.
     """
-    config = load_env_vars()
     if chat_app_url is None:
-        chat_app_url = config['chat_app_url']
+        chat_app_url = os.getenv('chat_app_url')
     
     url = f"{chat_app_url.rstrip('/')}/api/v1/messages/thread/{message_id}"
     
@@ -112,7 +113,7 @@ def get_user_messages(username, auth_token=None, chat_app_url=None):
     if not auth_token:
         auth_token = os.getenv('CHAT_APP_AUTH_TOKEN')
     if not chat_app_url:
-        chat_app_url = os.getenv('CHAT_APP_URL')
+        chat_app_url = os.getenv('chat_app_url')
     
     # Fix: Add 'Bearer' prefix if it's not already there
     if auth_token and not auth_token.startswith('Bearer '):
@@ -189,9 +190,8 @@ def get_all_users(auth_token=None, chat_app_url=None):
     Retrieve all users with their online status.
     If auth_token is not provided, will attempt to login using env credentials.
     """
-    config = load_env_vars()
     if chat_app_url is None:
-        chat_app_url = config['chat_app_url']
+        chat_app_url = os.getenv('chat_app_url')
     
     # Get auth token if not provided
     if auth_token is None:
