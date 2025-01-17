@@ -29,6 +29,7 @@ interface MessageListProps {
   onRemoveReaction: (channelId: string, messageId: string, emoji: string) => void;
   onLoadMore?: () => Promise<void>;
   hasMore?: boolean;
+  selectedMessageTimestamp?: string | null;
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -37,7 +38,8 @@ const MessageList: React.FC<MessageListProps> = ({
   onAddReaction,
   onRemoveReaction,
   onLoadMore,
-  hasMore = false
+  hasMore = false,
+  selectedMessageTimestamp
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -135,21 +137,26 @@ const MessageList: React.FC<MessageListProps> = ({
             )
             .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) // Sort ascending, oldest to newest
             .map((message) => (
-              <Message
+              <div
                 key={message.id}
-                id={message.id}
-                content={message.content}
-                username={message.username}
-                userId={message.user_id}
-                channelId={channelId}
-                createdAt={new Date(message.created_at).toLocaleString()}
-                emojis={message.emojis}
-                file={message.file}
-                repliesCount={message.replies_count}
-                onAddReaction={onAddReaction}
-                onRemoveReaction={onRemoveReaction}
-                onReply={handleReply}
-              />
+                data-timestamp={message.created_at}
+                className="transition-colors duration-300"
+              >
+                <Message
+                  id={message.id}
+                  content={message.content}
+                  username={message.username}
+                  userId={message.user_id}
+                  channelId={channelId}
+                  createdAt={message.created_at}
+                  emojis={message.emojis}
+                  file={message.file}
+                  repliesCount={message.replies_count}
+                  onAddReaction={onAddReaction}
+                  onRemoveReaction={onRemoveReaction}
+                  onReply={handleReply}
+                />
+              </div>
             ))
         )}
         <div ref={messagesEndRef} />

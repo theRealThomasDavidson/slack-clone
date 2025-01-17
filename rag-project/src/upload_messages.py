@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from src.client.retrieve_data import get_all_channels, get_channel_messages, login_user
 from src.client.auth import register_user
+from src.data_prep.message_tracker import MessageTracker
 
 load_dotenv()
 
@@ -24,7 +25,7 @@ def format_message(message):
     
     # Build the message content
     content = f"Time: {formatted_time}\n"
-    content += f"Channel: {message.get('channel_id', 'Unknown')}\n"
+    content += f"Channel: {message.get('channel_name', 'Unknown')}\n"
     content += f"User: {message.get('username', 'Unknown')}\n"
     content += f"Message: {message.get('content', '')}\n"
     
@@ -39,45 +40,26 @@ def format_message(message):
     
     return content
 
-def get_all_messages():
-    """Retrieve all messages from all channels."""
-    auth_token = login_user(chat_app_url=os.getenv("chat_app_url"),
-            chat_app_username=os.getenv("chat_app_username"),
-            chat_app_password=os.getenv("chat_app_password"))
-    if not auth_token:
-        print("Failed to login")
-        return []
-    
-    all_messages = []
-    channels = get_all_channels(auth_token)
-    
-    if channels:
-        for channel in channels:
-            print(f"Fetching messages from channel: {channel['name']}")
-            messages = get_channel_messages(channel['id'], auth_token)
-            if messages:
-                all_messages.extend(messages)
-    
-    return all_messages
-
 def main():
-    # Get all messages
-    print(register_user(
-        username=os.getenv("chat_app_username"),
-        email=f"{os.getenv('chat_app_username')}@example.com",
-        password=os.getenv("chat_app_password")
-    ))
     print("\n=== Starting message indexing ===")
-    print("Retrieving messages from chat...")
-    raw_messages = get_all_messages()
     
-    if not raw_messages:
-        print("No messages found")
+    # Initialize message tracker
+    tracker = MessageTracker()
+    
+    # Get new messages since last check
+    print("Retrieving new messages from chat...")
+    new_messages = tracker.get_new_messages()
+    
+    if not new_messages:
+        print("No new messages to index")
+        print("=== Message indexing complete ===\n")
         return
+    
+    print(f"Found {len(new_messages)} new messages to index")
     
     # Convert messages to documents
     documents = []
-    for msg in raw_messages:
+    for msg in new_messages:
         formatted_content = format_message(msg)
         # Create metadata for better retrieval
         metadata = {
@@ -109,6 +91,12 @@ def main():
             namespace="chat-messages"
         )
         print("Successfully uploaded messages to Pinecone")
+        
+        # Update last checked timestamp to latest message
+        latest_timestamp = max(msg['created_at'] for msg in new_messages)
+        tracker.save_last_checked(latest_timestamp)
+        print(f"Updated last checked timestamp to {latest_timestamp}")
+        
         print("=== Message indexing complete ===\n")
     except Exception as e:
         print(f"Error uploading to Pinecone: {str(e)}")

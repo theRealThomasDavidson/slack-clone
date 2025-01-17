@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChatWindow from '../components/chat/ChatWindow';
 import ChannelList from '../components/chat/ChannelList';
+import MessageSearch from '../components/chat/MessageSearch';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Channel {
@@ -19,6 +20,7 @@ const Chat: React.FC = () => {
   const [currentChannelId, setCurrentChannelId] = useState<string>('');
   const [activeDmUserId, setActiveDmUserId] = useState<string>('');
   const [navigating, setNavigating] = useState(false);
+  const [selectedMessageTimestamp, setSelectedMessageTimestamp] = useState<string | null>(null);
 
   const handleChannelSelect = (channelId: string) => {
     setCurrentChannelId(channelId);
@@ -28,6 +30,11 @@ const Chat: React.FC = () => {
     } else {
       setActiveDmUserId('');
     }
+  };
+
+  const handleMessageSelect = (channelId: string, timestamp: string) => {
+    handleChannelSelect(channelId);
+    setSelectedMessageTimestamp(timestamp);
   };
 
   const handleYouTubeSearchClick = () => {
@@ -72,10 +79,22 @@ const Chat: React.FC = () => {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col h-full">
         {currentChannelId ? (
-          <ChatWindow channelId={currentChannelId} />
+          <ChatWindow 
+            channelId={currentChannelId} 
+            selectedMessageTimestamp={selectedMessageTimestamp}
+            onMessageScrolled={() => setSelectedMessageTimestamp(null)}
+          />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            Select a channel or user to start chatting
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="text-gray-400 mb-8">
+              Select a channel or user to start chatting
+            </div>
+            <div className="w-full max-w-2xl">
+              <MessageSearch 
+                className="p-4 bg-gray-900 rounded-lg shadow-lg"
+                onSelectMessage={handleMessageSelect}
+              />
+            </div>
           </div>
         )}
       </div>

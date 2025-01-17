@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import MessageSearch from './MessageSearch';
 import { useApi } from '../../contexts/ApiContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_BASE_URL } from '../../contexts/BackendConfig';
@@ -27,12 +28,19 @@ interface MessageData {
 
 interface ChatWindowProps {
   channelId: string;
+  selectedMessageTimestamp?: string | null;
+  onMessageScrolled?: () => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ 
+  channelId, 
+  selectedMessageTimestamp,
+  onMessageScrolled 
+}) => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [channelName, setChannelName] = useState<string>('');
+  const [showSearch, setShowSearch] = useState(false);
   const api = useApi();
   const { token } = useAuth();
 
@@ -132,12 +140,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
     }
   }, [channelId, token]);
 
+  // Effect to scroll to selected message
+  useEffect(() => {
+    if (selectedMessageTimestamp && messages.length > 0) {
+      const messageElement = document.querySelector(`[data-timestamp="${selectedMessageTimestamp}"]`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        messageElement.classList.add('bg-blue-900', 'transition-colors', 'duration-1000');
+        setTimeout(() => {
+          messageElement.classList.remove('bg-blue-900');
+          if (onMessageScrolled) {
+            onMessageScrolled();
+          }
+        }, 2000);
+      }
+    }
+  }, [selectedMessageTimestamp, messages, onMessageScrolled]);
+
   return (
     <div className="flex flex-col h-full bg-gray-800">
       {/* Channel header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h2 className="text-lg font-semibold text-white">{channelName || 'Loading...'}</h2>
+        <button
+          onClick={() => setShowSearch(!showSearch)}
+          className="p-2 text-gray-400 hover:text-white focus:outline-none"
+          title="Search similar messages"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
       </div>
+
+      {/* Search area */}
+      {showSearch && (
+        <MessageSearch 
+          onClose={() => setShowSearch(false)} 
+          className="p-4 bg-gray-900 border-b border-gray-700"
+        />
+      )}
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
@@ -149,6 +191,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ channelId }) => {
             channelId={channelId}
             onAddReaction={handleAddReaction}
             onRemoveReaction={handleRemoveReaction}
+            selectedMessageTimestamp={selectedMessageTimestamp}
           />
         )}
       </div>
