@@ -46,7 +46,7 @@ const MessageSearch: React.FC<MessageSearchProps> = ({ onClose, className = '', 
     setResults([]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/similar-messages`, {
+      const response = await fetch(`http://ec2-18-119-162-96.us-east-2.compute.amazonaws.com:8001/api/similar-messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
