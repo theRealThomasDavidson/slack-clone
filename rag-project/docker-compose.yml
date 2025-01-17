@@ -3,6 +3,7 @@ version: "3.8"
 services:
   character-ais:
     build: .
+    network_mode: "host"
     volumes:
       - ./logs:/app/logs
     environment:

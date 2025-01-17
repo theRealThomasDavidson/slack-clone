@@ -46,10 +46,17 @@ services:
       - /app/node_modules
     environment:
       - VITE_CHAT_API_URL=http://api:8000
-      - VITE_PHILOSOPHY_API_URL=http://localhost:8001
+      - VITE_PHILOSOPHY_API_URL=/youtube
     depends_on:
       - api
-
+    networks:
+      - default
+      - youtube-search-net
 volumes:
   postgres_data:
   uploads:
+# In webapp's docker-compose.yml
+networks:
+  default:
+  youtube-search-net:
+    external: true

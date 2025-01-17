@@ -27,11 +27,11 @@ const getYouTubeInfo = (url: string, timestamp: number = 0) => {
   };
 };
 
-const API_URL = import.meta.env.VITE_PHILOSOPHY_API_URL || 'http://localhost:8001';
+const API_URL = 'http://ec2-18-119-162-96.us-east-2.compute.amazonaws.com:8001/api';
 
 const YouTubeSearch: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Initialize state from localStorage
   const [question, setQuestion] = useState(() => {
     const savedState = localStorage.getItem('youtube_search_state');
@@ -41,7 +41,7 @@ const YouTubeSearch: React.FC = () => {
     }
     return '';
   });
-  
+
   const [response, setResponse] = useState<YouTubeSearchResponse | null>(() => {
     const savedState = localStorage.getItem('youtube_search_state');
     if (savedState) {
@@ -50,7 +50,7 @@ const YouTubeSearch: React.FC = () => {
     }
     return null;
   });
-  
+
   // Clear youtube_search_state after loading
   useEffect(() => {
     localStorage.removeItem('youtube_search_state');
@@ -74,30 +74,40 @@ const YouTubeSearch: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    
+
     const request: QuestionRequest = {
       question,
       num_segments: 15
     };
-    
+
     try {
-      const res = await fetch(`${API_URL}/api/ask`, {
+      console.log('Starting request...');
+      const startTime = Date.now();
+      
+      const res = await fetch(`${API_URL}/ask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
+        mode: 'cors',
+        credentials: 'omit',
+        keepalive: true,
       });
-      
+
+      const endTime = Date.now();
+      console.log(`Request completed in ${(endTime - startTime) / 1000} seconds`);
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
+
       const data = await res.json();
       setResponse(data);
-    } catch (err) {
-      setError('Failed to get answer. Please try again.');
-      console.error('Error:', err);
+    } catch (err: any) {
+      console.error('Error details:', err);
+      setError('Failed to get answer. Please try again. Error: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -125,7 +135,7 @@ const YouTubeSearch: React.FC = () => {
             Back to Chat
           </button>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="mb-8">
           <div className="flex flex-col gap-4">
             <textarea
@@ -205,4 +215,4 @@ const YouTubeSearch: React.FC = () => {
   );
 };
 
-export default YouTubeSearch; 
+export default YouTubeSearch;
