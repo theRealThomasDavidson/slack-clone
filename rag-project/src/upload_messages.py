@@ -105,7 +105,8 @@ def main():
         vector_store = Pinecone.from_documents(
             documents=split_docs,
             embedding=embeddings,
-            index_name=PINECONE_INDEX
+            index_name=PINECONE_INDEX,
+            namespace="chat-messages"
         )
         print("Successfully uploaded messages to Pinecone")
         print("=== Message indexing complete ===\n")

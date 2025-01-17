@@ -33,8 +33,8 @@ def main():
     # Schedule the character job to run every minute
     schedule.every(1).minutes.do(character_job)
     
-    # Schedule the indexing job to run every 10 minutes
-    schedule.every(10).minutes.do(indexing_job)
+    # Schedule the indexing job to run every 15 seconds
+    schedule.every(15).seconds.do(indexing_job)
     
     # Run both jobs immediately once
     character_job()
