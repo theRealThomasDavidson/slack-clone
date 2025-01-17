@@ -1,11 +1,13 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_pinecone import PineconeVectorStore
+from langchain_pinecone import Pinecone
 from langchain.schema import Document
 import os
 from dotenv import load_dotenv
 from datetime import datetime
 from src.client.retrieve_data import get_all_channels, get_channel_messages, login_user
+from src.client.auth import register_user
+from src.data_prep.message_tracker import MessageTracker
 
 load_dotenv()
 
@@ -14,7 +16,7 @@ os.environ["PINECONE_API_KEY"] = os.getenv("PINECONE_API_KEY")
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["LANGCHAIN_TRACING_V2"] = os.getenv("LANGCHAIN_TRACING_V2")
 os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT")
-PINECONE_INDEX = os.getenv("PINECONE_INDEX")
+PINECONE_INDEX = os.getenv("PINECONE_INDEX_3")
 
 def format_message(message):
     """Format a chat message into a structured string."""
@@ -23,7 +25,7 @@ def format_message(message):
     
     # Build the message content
     content = f"Time: {formatted_time}\n"
-    content += f"Channel: {message.get('channel_id', 'Unknown')}\n"
+    content += f"Channel: {message.get('channel_name', 'Unknown')}\n"
     content += f"User: {message.get('username', 'Unknown')}\n"
     content += f"Message: {message.get('content', '')}\n"
     
@@ -38,37 +40,26 @@ def format_message(message):
     
     return content
 
-def get_all_messages():
-    """Retrieve all messages from all channels."""
-    auth_token = login_user()
-    if not auth_token:
-        print("Failed to login")
-        return []
-    
-    all_messages = []
-    channels = get_all_channels(auth_token)
-    
-    if channels:
-        for channel in channels:
-            print(f"Fetching messages from channel: {channel['name']}")
-            messages = get_channel_messages(channel['id'], auth_token)
-            if messages:
-                all_messages.extend(messages)
-    
-    return all_messages
-
 def main():
-    # Get all messages
-    print("Retrieving messages from chat...")
-    raw_messages = get_all_messages()
+    print("\n=== Starting message indexing ===")
     
-    if not raw_messages:
-        print("No messages found")
+    # Initialize message tracker
+    tracker = MessageTracker()
+    
+    # Get new messages since last check
+    print("Retrieving new messages from chat...")
+    new_messages = tracker.get_new_messages()
+    
+    if not new_messages:
+        print("No new messages to index")
+        print("=== Message indexing complete ===\n")
         return
+    
+    print(f"Found {len(new_messages)} new messages to index")
     
     # Convert messages to documents
     documents = []
-    for msg in raw_messages:
+    for msg in new_messages:
         formatted_content = format_message(msg)
         # Create metadata for better retrieval
         metadata = {
@@ -92,15 +83,24 @@ def main():
     
     # Upload to Pinecone
     try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-        vector_store = PineconeVectorStore.from_documents(
+        embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
+        vector_store = Pinecone.from_documents(
             documents=split_docs,
             embedding=embeddings,
-            index_name=PINECONE_INDEX
+            index_name=PINECONE_INDEX,
+            namespace="chat-messages"
         )
         print("Successfully uploaded messages to Pinecone")
+        
+        # Update last checked timestamp to latest message
+        latest_timestamp = max(msg['created_at'] for msg in new_messages)
+        tracker.save_last_checked(latest_timestamp)
+        print(f"Updated last checked timestamp to {latest_timestamp}")
+        
+        print("=== Message indexing complete ===\n")
     except Exception as e:
         print(f"Error uploading to Pinecone: {str(e)}")
+        print("=== Message indexing failed ===\n")
 
 if __name__ == "__main__":
     main() 

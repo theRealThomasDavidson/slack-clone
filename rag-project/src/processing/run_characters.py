@@ -7,6 +7,7 @@ import schedule
 from pathlib import Path
 from dotenv import load_dotenv
 from .character_ai import CharacterAI
+from ..upload_messages import main as index_messages
 
 # Get the rag-project root directory and load .env
 RAG_PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -92,15 +93,26 @@ def run_all_characters():
     hank.check_and_respond()
     print("All character checks complete!")
 
+def run_indexing():
+    """Run message indexing."""
+    try:
+        index_messages()
+    except Exception as e:
+        print(f"Error in indexing job: {str(e)}")
+
 def main():
     """Run the scheduler."""
     print("Starting Breaking Bad Character AI Scheduler")
     
-    # Schedule the job to run every minute
+    # Schedule character checks every 15 seconds
     schedule.every(15).seconds.do(run_all_characters)
     
-    # Run once immediately
+    # Schedule indexing every 10 minutes
+    schedule.every(10).minutes.do(run_indexing)
+    
+    # Run both immediately
     run_all_characters()
+    run_indexing()
     
     # Keep running
     while True:
