@@ -19,7 +19,11 @@ def get_all_channels(auth_token=None, chat_app_url=None):
     
     # Get auth token if not provided
     if auth_token is None:
-        auth_token = login_user(chat_app_url=chat_app_url)
+        auth_token = login_user(
+            chat_app_url=chat_app_url,
+            chat_app_username=os.getenv("chat_app_username"),
+            chat_app_password=os.getenv("chat_app_password")
+        )
         if auth_token is None:
             print("Failed to get authentication token")
             return None
@@ -51,7 +55,11 @@ def get_channel_messages(channel_id, auth_token=None, chat_app_url=None):
     
     # Get auth token if not provided
     if auth_token is None:
-        auth_token = login_user(chat_app_url=chat_app_url)
+        auth_token = login_user(
+            chat_app_url=chat_app_url,
+            chat_app_username=os.getenv("JESSE_USERNAME"),
+            chat_app_password=os.getenv("JESSE_PASSWORD")
+        )
         if auth_token is None:
             print("Failed to get authentication token")
             return None
@@ -111,7 +119,12 @@ def print_message_tree(messages, auth_token, chat_app_url, indent=0):
 def get_user_messages(username, auth_token=None, chat_app_url=None):
     """Get all messages from a specific user."""
     if not auth_token:
-        auth_token = os.getenv('CHAT_APP_AUTH_TOKEN')
+        chat_app_url = os.getenv('chat_app_url')
+        auth_token = login_user(
+            chat_app_url=chat_app_url,
+            chat_app_username=os.getenv("JESSE_USERNAME"),
+            chat_app_password=os.getenv("JESSE_PASSWORD")
+        )
     if not chat_app_url:
         chat_app_url = os.getenv('chat_app_url')
     
@@ -195,7 +208,11 @@ def get_all_users(auth_token=None, chat_app_url=None):
     
     # Get auth token if not provided
     if auth_token is None:
-        auth_token = login_user(chat_app_url=chat_app_url)
+        auth_token = login_user(
+            chat_app_url=chat_app_url,
+            chat_app_username=os.getenv("JESSE_USERNAME"),
+            chat_app_password=os.getenv("JESSE_PASSWORD")
+        )
         if auth_token is None:
             print("Failed to get authentication token")
             return None
@@ -241,7 +258,12 @@ def print_users(auth_token=None, chat_app_url=None):
 
 if __name__ == "__main__":
     # Example usage
-    auth_token = login_user()
+    chat_app_url = os.getenv('chat_app_url')
+    auth_token = login_user(
+        chat_app_url=chat_app_url,
+        chat_app_username=os.getenv("JESSE_USERNAME"),
+        chat_app_password=os.getenv("JESSE_PASSWORD")
+    )
     if auth_token:
         print("\nGetting all users:")
         print_users(auth_token)
