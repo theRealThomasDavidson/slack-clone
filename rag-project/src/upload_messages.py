@@ -62,9 +62,11 @@ def get_all_messages():
 
 def main():
     # Get all messages
-    register_user(username=os.getenv("chat_app_username"),
-                 email=f"{os.getenv("chat_app_username")}@example.com",
-                 password=os.getenv("chat_app_password"))
+    print(register_user(
+        username=os.getenv("chat_app_username"),
+        email=f"{os.getenv('chat_app_username')}@example.com",
+        password=os.getenv("chat_app_password")
+    ))
     print("\n=== Starting message indexing ===")
     print("Retrieving messages from chat...")
     raw_messages = get_all_messages()
