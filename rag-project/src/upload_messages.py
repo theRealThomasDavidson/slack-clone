@@ -101,7 +101,7 @@ def main():
     
     # Upload to Pinecone
     try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
         vector_store = Pinecone.from_documents(
             documents=split_docs,
             embedding=embeddings,
