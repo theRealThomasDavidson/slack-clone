@@ -57,8 +57,8 @@ def get_channel_messages(channel_id, auth_token=None, chat_app_url=None):
     if auth_token is None:
         auth_token = login_user(
             chat_app_url=chat_app_url,
-            chat_app_username=os.getenv("JESSE_USERNAME"),
-            chat_app_password=os.getenv("JESSE_PASSWORD")
+            chat_app_username=os.getenv("chat_app_username"),
+            chat_app_password=os.getenv("chat_app_password")
         )
         if auth_token is None:
             print("Failed to get authentication token")
@@ -122,8 +122,8 @@ def get_user_messages(username, auth_token=None, chat_app_url=None):
         chat_app_url = os.getenv('chat_app_url')
         auth_token = login_user(
             chat_app_url=chat_app_url,
-            chat_app_username=os.getenv("JESSE_USERNAME"),
-            chat_app_password=os.getenv("JESSE_PASSWORD")
+            chat_app_username=os.getenv("chat_app_username"),
+            chat_app_password=os.getenv("chat_app_password")
         )
     if not chat_app_url:
         chat_app_url = os.getenv('chat_app_url')
@@ -210,8 +210,8 @@ def get_all_users(auth_token=None, chat_app_url=None):
     if auth_token is None:
         auth_token = login_user(
             chat_app_url=chat_app_url,
-            chat_app_username=os.getenv("JESSE_USERNAME"),
-            chat_app_password=os.getenv("JESSE_PASSWORD")
+            chat_app_username=os.getenv("chat_app_username"),
+            chat_app_password=os.getenv("chat_app_password")
         )
         if auth_token is None:
             print("Failed to get authentication token")
@@ -261,8 +261,8 @@ if __name__ == "__main__":
     chat_app_url = os.getenv('chat_app_url')
     auth_token = login_user(
         chat_app_url=chat_app_url,
-        chat_app_username=os.getenv("JESSE_USERNAME"),
-        chat_app_password=os.getenv("JESSE_PASSWORD")
+        chat_app_username=os.getenv("chat_app_username"),
+        chat_app_password=os.getenv("chat_app_password")
     )
     if auth_token:
         print("\nGetting all users:")
