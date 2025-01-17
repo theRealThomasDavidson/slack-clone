@@ -14,7 +14,7 @@ os.environ["PINECONE_API_KEY"] = os.getenv("PINECONE_API_KEY")
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 os.environ["LANGCHAIN_TRACING_V2"] = os.getenv("LANGCHAIN_TRACING_V2")
 os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT")
-PINECONE_INDEX = os.getenv("PINECONE_INDEX")
+PINECONE_INDEX = os.getenv("PINECONE_INDEX_3")
 
 def format_message(message):
     """Format a chat message into a structured string."""
@@ -59,6 +59,7 @@ def get_all_messages():
 
 def main():
     # Get all messages
+    print("\n=== Starting message indexing ===")
     print("Retrieving messages from chat...")
     raw_messages = get_all_messages()
     
@@ -99,8 +100,10 @@ def main():
             index_name=PINECONE_INDEX
         )
         print("Successfully uploaded messages to Pinecone")
+        print("=== Message indexing complete ===\n")
     except Exception as e:
         print(f"Error uploading to Pinecone: {str(e)}")
+        print("=== Message indexing failed ===\n")
 
 if __name__ == "__main__":
     main() 
