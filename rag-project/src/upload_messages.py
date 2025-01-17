@@ -40,7 +40,9 @@ def format_message(message):
 
 def get_all_messages():
     """Retrieve all messages from all channels."""
-    auth_token = login_user()
+    auth_token = login_user(chat_app_url=os.getenv("chat_app_url"),
+            chat_app_username=os.getenv("chat_app_username"),
+            chat_app_password=os.getenv("chat_app_password"))
     if not auth_token:
         print("Failed to login")
         return []
